@@ -250,7 +250,15 @@ Android master token → Photos access token → private Photos API
   Photos the camera saves with an adjustment, such as Portrait) when a
   Google-side setting is on for the account, even when Google's own backup
   uploaded them. Photos Backup backs them up in full, but cannot make Google
-  offer them for removal.
+  offer them for removal. The Google Photos app's multi-select Delete from
+  device does remove them, since it only needs the photo to be backed up.
+- A photo or video saved to the iPhone from Google Photos (a file with a name
+  like `AIXW8346.JPG`) never counts as backed up in the Google Photos app, even
+  though the library already holds it: an upload of the same bytes merges into
+  that existing item. Any edit in Apple Photos makes a new file, which then
+  counts once backed up.
+- An edited photo or video is backed up as it looks on the iPhone. Its
+  unedited original is kept only if an earlier backup uploaded it.
 - Background album backup is opportunistic: iOS decides when each processing
   request runs and may delay it based on usage, battery, and system policy.
 - Continuing after you leave the app needs iOS 26, and iOS accepts the request
