@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Photos
 import PhotosUI
@@ -16,6 +17,10 @@ enum MediaSource: Equatable, Sendable {
     case picked(PickedItem)
     /// An existing file. Used by tests and by anything that already staged one.
     case file(URL)
+    /// The motion of the Live Photo with this `PHAsset` identifier: its paired
+    /// video, attached to the still already backed up so the item plays as a
+    /// Live Photo and the Google Photos app's Free up space can offer it.
+    case livePhotoMotion(localIdentifier: String)
 }
 
 /// A picked item with no resolvable asset id. Wraps the provider so the file
@@ -34,6 +39,9 @@ struct ExportedMedia: Equatable, Sendable {
     let byteCount: Int64
     /// False for `.file` sources, which the exporter does not own and must not delete.
     let temporary: Bool
+    /// For a Live Photo motion: SHA-1 of the still the motion belongs to, the
+    /// dedup key of the item it is attached to.
+    var pairedStillHash: Data? = nil
 }
 
 /// Turns a `MediaSource` into a file `GPMCClient.upload` can read, and cleans
@@ -45,12 +53,14 @@ actor MediaExporter {
         case noResource
         case unreadable(String)
         case liveOnly
+        case noMotion
         case iCloudDownloadRequired
         var errorDescription: String? {
             switch self {
             case .missingAsset: return "That item is no longer in your photo library."
             case .noResource: return "That item has no file to upload."
             case .liveOnly: return "That item is a Live Photo motion track, which this release does not upload."
+            case .noMotion: return "That Live Photo has no motion to back up."
             case .iCloudDownloadRequired: return "That item is only in iCloud. It will continue when the app is open."
             case .unreadable(let detail): return "Could not read that item: \(detail)"
             }
@@ -128,6 +138,8 @@ actor MediaExporter {
         case .picked(let picked):
             let url = try await Self.copyToStaging(from: picked.provider)
             return try describe(url, filename: url.lastPathComponent, modified: nil, temporary: true)
+        case .livePhotoMotion(let identifier):
+            return try await exportMotion(identifier, allowsNetworkAccess: allowsNetworkAccess)
         }
     }
 
@@ -163,6 +175,12 @@ actor MediaExporter {
         }
     }
 
+    /// The paired video attached as a Live Photo's motion: the rendered edit's
+    /// video for an edited asset, as the Google Photos app attaches it.
+    static func motionResourceTypes(edited: Bool) -> [PHAssetResourceType] {
+        edited ? [.fullSizePairedVideo, .pairedVideo] : [.pairedVideo]
+    }
+
     /// A rendered edit is named `FullSizeRender.heic`. Upload it under the
     /// original's name instead, with the rendition's file type.
     static func uploadFilename(original: String?, rendition: String) -> String {
@@ -185,6 +203,33 @@ actor MediaExporter {
         }
         let original = resources.first { $0.type == .photo || $0.type == .video }?.originalFilename
         let filename = Self.uploadFilename(original: original, rendition: resource.originalFilename)
+        return try await stage(resource, as: filename, of: asset, allowsNetworkAccess: allowsNetworkAccess)
+    }
+
+    /// A Live Photo's paired video, plus the hash of the still it belongs to.
+    /// The still is hashed as it streams in rather than staged: only its hash
+    /// is needed, to name the item the motion is attached to.
+    private func exportMotion(_ identifier: String, allowsNetworkAccess: Bool) async throws -> ExportedMedia {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject else {
+            throw Failure.missingAsset
+        }
+        let resources = PHAssetResource.assetResources(for: asset)
+        let edited = asset.hasAdjustments
+        func first(_ types: [PHAssetResourceType]) -> PHAssetResource? {
+            types.compactMap { type in resources.first { $0.type == type } }.first
+        }
+        guard let video = first(Self.motionResourceTypes(edited: edited)) else { throw Failure.noMotion }
+        guard let still = first(Self.uploadResourceTypes(for: .image, edited: edited)) else { throw Failure.noResource }
+        let stillHash = try await Self.sha1(of: still, allowsNetworkAccess: allowsNetworkAccess)
+        let original = resources.first { $0.type == .pairedVideo }?.originalFilename
+        let filename = Self.uploadFilename(original: original, rendition: video.originalFilename)
+        var media = try await stage(video, as: filename, of: asset, allowsNetworkAccess: allowsNetworkAccess)
+        media.pairedStillHash = stillHash
+        return media
+    }
+
+    private func stage(_ resource: PHAssetResource, as filename: String, of asset: PHAsset,
+                       allowsNetworkAccess: Bool) async throws -> ExportedMedia {
         let destination = try Self.stage(named: filename)
         let options = PHAssetResourceRequestOptions()
         options.isNetworkAccessAllowed = allowsNetworkAccess
@@ -192,14 +237,7 @@ actor MediaExporter {
             try await PHAssetResourceManager.default().writeData(for: resource, toFile: destination, options: options)
         } catch {
             try? FileManager.default.removeItem(at: destination.deletingLastPathComponent())
-            if Task.isCancelled { throw CancellationError() }
-            let nsError = error as NSError
-            if !allowsNetworkAccess,
-               nsError.domain == PHPhotosErrorDomain,
-               nsError.code == 3164 {
-                throw Failure.iCloudDownloadRequired
-            }
-            throw Failure.unreadable(error.localizedDescription)
+            throw Self.readFailure(error, allowsNetworkAccess: allowsNetworkAccess)
         }
         do {
             return try describe(destination, filename: filename,
@@ -211,6 +249,34 @@ actor MediaExporter {
             try? FileManager.default.removeItem(at: destination.deletingLastPathComponent())
             throw error
         }
+    }
+
+    private static func sha1(of resource: PHAssetResource, allowsNetworkAccess: Bool) async throws -> Data {
+        let options = PHAssetResourceRequestOptions()
+        options.isNetworkAccessAllowed = allowsNetworkAccess
+        let hasher = StreamingSHA1()
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                PHAssetResourceManager.default().requestData(for: resource, options: options) { data in
+                    hasher.update(data)
+                } completionHandler: { error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
+            }
+        } catch {
+            throw readFailure(error, allowsNetworkAccess: allowsNetworkAccess)
+        }
+        try Task.checkCancellation()
+        return hasher.finalize()
+    }
+
+    private static func readFailure(_ error: Error, allowsNetworkAccess: Bool) -> Error {
+        if Task.isCancelled { return CancellationError() }
+        let nsError = error as NSError
+        if !allowsNetworkAccess, nsError.domain == PHPhotosErrorDomain, nsError.code == 3164 {
+            return Failure.iCloudDownloadRequired
+        }
+        return Failure.unreadable(error.localizedDescription)
     }
 
     private func describe(_ url: URL, filename: String, modified: Date?, temporary: Bool) throws -> ExportedMedia {
@@ -279,6 +345,21 @@ extension PHAssetResourceManager {
             cancellation.cancel()
         }
         try Task.checkCancellation()
+    }
+}
+
+/// SHA-1 fed from PhotoKit's data callbacks, which arrive on its own queue.
+private final class StreamingSHA1: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hasher = Insecure.SHA1()
+
+    func update(_ data: Data) {
+        lock.lock(); hasher.update(data: data); lock.unlock()
+    }
+
+    func finalize() -> Data {
+        lock.lock(); defer { lock.unlock() }
+        return Data(hasher.finalize())
     }
 }
 

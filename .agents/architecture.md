@@ -36,7 +36,7 @@ Generated `PhotosBackup.xcodeproj` is disposable — regenerate, don't hand-edit
 | `AutomaticBackupCoordinator` | AutomaticBackupCoordinator.swift | BGProcessingTask scheduling; batches: 25/background window, 250/foreground |
 | `NetworkPolicy` / monitor | NetworkPolicy.swift | Wi-Fi-only vs Wi-Fi+cellular, enforced at queue + request level |
 | `CredentialStore` | CredentialStore.swift | Single Keychain item, `AfterFirstUnlockThisDeviceOnly` |
-| `MediaExport` / `PhotosUploader` | MediaExport.swift / PhotosUploader.swift | PHAsset export → hash → duplicate-check → upload → finalize; Live Photos = still only |
+| `MediaExport` / `PhotosUploader` | MediaExport.swift / PhotosUploader.swift | PHAsset export → hash → duplicate-check → upload → finalize; Live Photos = still, then motion attached as a separate `livePhotoMotion` row |
 
 ## Data flow
 

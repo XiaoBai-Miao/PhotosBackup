@@ -44,6 +44,13 @@ final class MediaExportTests: XCTestCase {
         XCTAssertFalse(MediaExporter.uploadResourceTypes(for: .image, edited: true).contains(.fullSizeVideo))
     }
 
+    /// The motion attached is the video that matches the still: the rendered
+    /// edit's video for an edited Live Photo, as the Google Photos app attaches it.
+    func testALivePhotoMotionIsThePairedVideoOfTheSameVersion() {
+        XCTAssertEqual(MediaExporter.motionResourceTypes(edited: false), [.pairedVideo])
+        XCTAssertEqual(MediaExporter.motionResourceTypes(edited: true).first, .fullSizePairedVideo)
+    }
+
     func testARenderedEditIsUploadedUnderTheOriginalName() {
         XCTAssertEqual(MediaExporter.uploadFilename(original: "IMG_0351.HEIC", rendition: "FullSizeRender.heic"), "IMG_0351.HEIC")
         XCTAssertEqual(MediaExporter.uploadFilename(original: "IMG_0007.PNG", rendition: "FullSizeRender.heic"), "IMG_0007.HEIC")

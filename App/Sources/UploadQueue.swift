@@ -105,7 +105,13 @@ private extension MediaSource {
         case .asset(let identifier): return "asset:\(identifier)"
         case .file(let url): return "file:\(url.standardizedFileURL.path)"
         case .picked: return nil
+        case .livePhotoMotion(let identifier): return UploadQueue.motionKeyPrefix + identifier
         }
+    }
+
+    var isLivePhotoMotion: Bool {
+        if case .livePhotoMotion = self { return true }
+        return false
     }
 }
 
@@ -585,7 +591,21 @@ final class UploadQueue: ObservableObject {
     /// Settings verify action uses to explain what will be re-checked: it is a
     /// set, so re-verifying an item that is already in the cloud re-records the
     /// same key and the total does not move.
-    var completedSourceCount: Int { completedSourceKeys.count }
+    ///
+    /// Live Photo motions are recorded in the same ledger under their own key
+    /// but are not counted: they add to a photo already counted here.
+    var completedSourceCount: Int { completedSourceKeys.count - completedMotionCount }
+
+    /// Ledger prefix of a Live Photo motion, keyed by its asset identifier.
+    nonisolated static let motionKeyPrefix = "motion:"
+
+    /// Live Photos whose motion is attached in Google Photos.
+    var completedMotionCount: Int { completedSourceKeys.lazy.filter { $0.hasPrefix(Self.motionKeyPrefix) }.count }
+
+    /// Asks, for each source that finishes, what else should back up after it.
+    /// Wired to queue a Live Photo's motion once its still is in the account,
+    /// since the motion is committed onto that still.
+    var followUpSources: (@MainActor (MediaSource) -> [MediaSource])?
 
     /// A snapshot test for "is this library asset already backed up", safe to
     /// hand to a background task computing per-album progress.
@@ -685,9 +705,9 @@ final class UploadQueue: ObservableObject {
             completedSourceKeys.formUnion(ledgerKeys)
             isUserPaused = snapshot.isUserPaused ?? false
             items = snapshot.items.compactMap { stored in
-                if let key = stored.source.mediaSource.queueDeduplicationKey,
+                if let key = stored.mediaSource.queueDeduplicationKey,
                    completedSourceKeys.contains(key) { return nil }
-                var item = UploadItem(id: stored.id, source: stored.source.mediaSource, name: stored.name)
+                var item = UploadItem(id: stored.id, source: stored.mediaSource, name: stored.name)
                 item.byteCount = stored.byteCount
                 item.attempts = stored.attempts
                 item.checkpoint = stored.checkpoint
@@ -960,6 +980,9 @@ final class UploadQueue: ObservableObject {
             items[index].checkpoint = nil
             recordCompletion(for: items[index])
             persist()
+            if let followUps = followUpSources?(items[index].source), !followUps.isEmpty {
+                enqueue(followUps, skippingExisting: true)
+            }
         case .failure(let error):
             // What the row was doing when it failed, before any of the
             // branches below overwrite it.
@@ -1124,6 +1147,7 @@ final class UploadQueue: ObservableObject {
             guard let source = PersistedMediaSource(item.source)
                     ?? item.checkpoint.map({ .file($0.filePath) }) else { return nil }
             let interruptions = item.interruptedPreparations > 0 ? item.interruptedPreparations : nil
+            let motion: Bool? = item.source.isLivePhotoMotion ? true : nil
             switch item.state {
             case .alreadyBackedUp, .done:
                 return nil
@@ -1133,20 +1157,20 @@ final class UploadQueue: ObservableObject {
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
-                                           checkpoint: nil, cancelled: true)
+                                           checkpoint: nil, cancelled: true, motion: motion)
             case .failed(let reason, let retryable):
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: reason, failureRetryable: retryable,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions)
+                                           interruptedPreparations: interruptions, motion: motion)
             default:
                 // Working and retry-delay states intentionally restore queued.
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions)
+                                           interruptedPreparations: interruptions, motion: motion)
             }
         }
         let snapshot = UploadQueueSnapshot(

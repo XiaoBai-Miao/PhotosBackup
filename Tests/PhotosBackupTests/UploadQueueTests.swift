@@ -496,6 +496,51 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(secondScript.calls, 1)
     }
 
+    /// A Live Photo's motion is committed onto its still, so the queue asks for
+    /// it only once the still has finished. The motion is recorded but not
+    /// counted: it adds to a photo already counted as backed up.
+    func testAFinishedLivePhotoQueuesItsMotionWithoutCountingIt() async {
+        let queue = makeQueue(WorkerScript([]), maxConcurrent: 1)
+        queue.followUpSources = { source in
+            guard case .asset(let identifier) = source, identifier == "live-1" else { return [] }
+            return [.livePhotoMotion(localIdentifier: identifier)]
+        }
+        queue.enqueue([.asset(localIdentifier: "live-1"), .asset(localIdentifier: "plain-1")])
+        await settle(queue) { queue.items.count == 3 && queue.items.allSatisfy { $0.state == .done } }
+        XCTAssertEqual(queue.items.map(\.source), [.asset(localIdentifier: "live-1"),
+                                                   .asset(localIdentifier: "plain-1"),
+                                                   .livePhotoMotion(localIdentifier: "live-1")])
+        XCTAssertEqual(queue.completedSourceCount, 2)
+        XCTAssertEqual(queue.completedMotionCount, 1)
+    }
+
+    /// A motion row is stored as its asset plus a flag, so builds without motion
+    /// rows still read the snapshot; this build restores it as a motion row.
+    func testAMotionRowRestoresAsAMotionRow() async {
+        let persistence = MemoryUploadQueuePersistence()
+        let first = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        first.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        first.activateAccount("person@gmail.com")
+        first.enqueue([.livePhotoMotion(localIdentifier: "live-1")], skippingExisting: true)
+
+        XCTAssertEqual(persistence.snapshot?.items.first?.source, .asset("live-1"))
+        XCTAssertEqual(persistence.snapshot?.items.first?.motion, true)
+
+        let restored = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        restored.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        restored.activateAccount("person@gmail.com")
+        XCTAssertEqual(restored.items.first?.source, .livePhotoMotion(localIdentifier: "live-1"))
+    }
+
+    func testAMotionCheckpointKeepsItsStillHash() throws {
+        let checkpoint = UploadCheckpoint(filePath: "/tmp/staged/IMG.MOV", filename: "IMG.MOV",
+                                          modified: Date(timeIntervalSince1970: 100), byteCount: 123,
+                                          temporary: true, prepared: nil,
+                                          pairedStillHash: Data(repeating: 4, count: 20))
+        let decoded = try JSONDecoder().decode(UploadCheckpoint.self, from: JSONEncoder().encode(checkpoint))
+        XCTAssertEqual(decoded.pairedStillHash, Data(repeating: 4, count: 20))
+    }
+
     func testUploadCheckpointRestoresAtTheTransferBoundary() async {
         let persistence = MemoryUploadQueuePersistence()
         let prepared = PreparedUpload(

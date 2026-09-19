@@ -7,5 +7,5 @@
 5. **Don't bypass network policy.** Wi-Fi-only / cellular enforcement lives at queue (`setNetworkAccess`) AND request level — keep both.
 6. **Don't assume background work completes.** Batches are bounded (25 bg / 250 fg); handle expiration via `suspendForBackgroundExpiration` → requeue. No infinite retry.
 7. **Don't break free-team sideload.** No hard dependency on App Group/Keychain existing; degrade to URL handoff + session-only with a warning. Nothing may assume stable signing identity.
-8. **Don't expand scope silently:** Live Photos = still image only; token binding unsupported; Google may kill private endpoints anytime — surface as errors, don't paper over.
+8. **Don't expand scope silently:** Live Photo motion is attached through its own `livePhotoMotion` queue rows; token binding unsupported; Google may kill private endpoints anytime — surface as errors, don't paper over.
 9. **Tests:** default to offline `xcodebuild test`. Live tests only when user explicitly provides a fresh token.

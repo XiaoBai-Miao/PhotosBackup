@@ -62,6 +62,7 @@ struct GPMCError: LocalizedError, Equatable {
         case malformed            // A response we could not make sense of.
         case invalidUploadReceipt // Restart preflight/PUT; never replay this receipt.
         case storageFull          // Google says the account has no room left.
+        case pairedPhotoMissing   // A Live Photo's motion arrived before its photo is in the account.
     }
     let kind: Kind
     let message: String
@@ -91,7 +92,7 @@ struct GPMCError: LocalizedError, Equatable {
     /// True when trying again may succeed without the user doing anything.
     var isRetryable: Bool {
         switch kind {
-        case .transport, .invalidUploadReceipt: return true
+        case .transport, .invalidUploadReceipt, .pairedPhotoMissing: return true
         case .server(let code): return code == 408 || code == 429 || code >= 500
         case .credentialRejected, .tokenBound, .malformed, .storageFull: return false
         }
@@ -421,6 +422,40 @@ actor GPMCClient {
     /// upload URL. No long-running body transfer happens in this method.
     func prepareUpload(file: URL, filename: String, modified: Date? = nil,
                        phase: @escaping @Sendable (UploadPhase) -> Void) async throws -> UploadPreparation {
+        let (hash, size) = try hashFile(file, phase: phase)
+        phase(.checkingDuplicate)
+        if let key = try await remoteMediaKey(sha1: hash) {
+            return .alreadyBackedUp(mediaKey: key)
+        }
+        return .ready(try await startUploadSession(file: file, filename: filename, modified: modified,
+                                                   hash: hash, size: size, phase: phase))
+    }
+
+    /// The motion of a Live Photo: its paired video, to be committed onto the
+    /// still already in the account (`stillHash`) so the item plays as a Live
+    /// Photo. The Google Photos iOS app offers a Live Photo in Free up space
+    /// only when its server item carries that motion.
+    ///
+    /// Settles as backed up when the video's hash already resolves as a Live
+    /// Photo motion — the same lookup the Google Photos app makes — and fails
+    /// retryably while the still is not in the account, since there is nothing
+    /// to attach the motion to yet.
+    func prepareMotionUpload(file: URL, filename: String, modified: Date? = nil, stillHash: Data,
+                             phase: @escaping @Sendable (UploadPhase) -> Void) async throws -> UploadPreparation {
+        let (hash, size) = try hashFile(file, phase: phase)
+        phase(.checkingDuplicate)
+        if let key = try await remoteMediaKey(sha1: hash, asLivePhotoMotion: true) {
+            return .alreadyBackedUp(mediaKey: key)
+        }
+        guard try await remoteMediaKey(sha1: stillHash) != nil else {
+            throw GPMCError(kind: .pairedPhotoMissing,
+                            message: "The photo for this Live Photo motion is not in Google Photos yet, so the motion waits for it.")
+        }
+        return .ready(try await startUploadSession(file: file, filename: filename, modified: modified,
+                                                   hash: hash, size: size, phase: phase))
+    }
+
+    private func hashFile(_ file: URL, phase: @escaping @Sendable (UploadPhase) -> Void) throws -> (hash: Data, size: UInt64) {
         let declared = (try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
         guard declared > 0 else { throw GPMCError(message: "That item is empty; there is nothing to upload.") }
         phase(.hashing(fraction: 0))
@@ -439,13 +474,21 @@ actor GPMCClient {
                 phase(.hashing(fraction: min(1, Double(size) / Double(declared))))
             }
         }
-        let hash = Data(hasher.finalize())
-        phase(.checkingDuplicate)
-        let check = Proto.bytes(1, Proto.bytes(1, Proto.bytes(1, hash)) + Proto.bytes(2, Data()))
+        return (Data(hasher.finalize()), size)
+    }
+
+    /// `PhotosReadItemsByContentHash`. A Live Photo motion is looked up with
+    /// `sha1MediaType` PhodeoMovie (2); it then resolves to the Live Photo's
+    /// item only when the motion is attached to it.
+    private func remoteMediaKey(sha1 hash: Data, asLivePhotoMotion: Bool = false) async throws -> String? {
+        let query = Proto.bytes(1, hash) + (asLivePhotoMotion ? Proto.int(5, 2) : Data())
+        let check = Proto.bytes(1, Proto.bytes(1, query) + Proto.bytes(2, Data()))
         let existing = try await rpc(Self.hashCheckMethod, body: check)
-        if let key = try Proto.string(at: [1, 2, 2, 1], in: existing) {
-            return .alreadyBackedUp(mediaKey: key)
-        }
+        return try Proto.string(at: [1, 2, 2, 1], in: existing)
+    }
+
+    private func startUploadSession(file: URL, filename: String, modified: Date?, hash: Data, size: UInt64,
+                                    phase: @escaping @Sendable (UploadPhase) -> Void) async throws -> PreparedUpload {
         phase(.preparing)
         let endpoint = URL(string: "https://photos.googleapis.com/data/upload/uploadmedia/interactive")!
         let body = Proto.int(1, 2) + Proto.int(2, 2) + Proto.int(3, 1) + Proto.int(4, 3) + Proto.int(7, size)
@@ -454,8 +497,8 @@ actor GPMCClient {
         var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "upload_id", value: uploadID)]
         let date = modified ?? (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date()
-        return .ready(PreparedUpload(uploadURL: components.url!, hash: hash, filename: filename,
-                                     modified: date, byteCount: Int64(size), receipt: nil))
+        return PreparedUpload(uploadURL: components.url!, hash: hash, filename: filename,
+                              modified: date, byteCount: Int64(size), receipt: nil)
     }
 
     /// Run (or reattach to) the file PUT through the injected transport.
@@ -534,7 +577,12 @@ actor GPMCClient {
     /// `useQuota` and `saver` are passed per call rather than read back off
     /// `prepared`, so the committed policy is always the one the user has set
     /// now, not the one in force when the item was prepared.
-    func commit(_ prepared: PreparedUpload, useQuota: Bool, saver: Bool,
+    ///
+    /// `pairedStillHash` commits the upload as the Live Photo motion of the
+    /// still with that hash: blueprint field 9 `reconcileInfo` with
+    /// `reconcileType` Phodeo (1), as the Google Photos iOS app attaches motion
+    /// to a still already in the account. Google returns the still's item.
+    func commit(_ prepared: PreparedUpload, useQuota: Bool, saver: Bool, pairedStillHash: Data? = nil,
                 phase: @escaping @Sendable (UploadPhase) -> Void) async throws -> UploadOutcome {
         guard let receipt = prepared.receipt else {
             throw GPMCError(message: "The upload has not finished transferring yet.")
@@ -543,7 +591,10 @@ actor GPMCClient {
         phase(.finalizing)
         let stamp = UInt64(max(0, prepared.modified.timeIntervalSince1970))
         let profile = Self.commitProfile(useQuota: useQuota, saver: saver)
-        let metadata = Proto.bytes(1, receipt) + Proto.string(2, prepared.filename) + Proto.bytes(3, prepared.hash) + Proto.bytes(4, Proto.int(1, stamp) + Proto.int(2, 46_000_000)) + Proto.int(7, profile.quality) + Proto.int(10, 1)
+        var metadata = Proto.bytes(1, receipt) + Proto.string(2, prepared.filename) + Proto.bytes(3, prepared.hash) + Proto.bytes(4, Proto.int(1, stamp) + Proto.int(2, 46_000_000)) + Proto.int(7, profile.quality) + Proto.int(10, 1)
+        if let pairedStillHash {
+            metadata += Proto.bytes(9, Proto.int(2, 1) + Proto.bytes(3, pairedStillHash))
+        }
         let device = Proto.string(3, profile.model) + Proto.string(4, "Google") + Proto.int(5, 28)
         let committed: Data
         do {

@@ -132,10 +132,11 @@ struct SettingsView: View {
             }
             Toggle("Storage Saver", isOn: $preferences.storageSaver)
             Toggle("Count Against Storage Quota", isOn: $preferences.useQuota)
+            Toggle("Back Up Live Photo Motion", isOn: $preferences.backUpLivePhotoMotion)
         } header: {
             Text("Backup")
         } footer: {
-            Text("More simultaneous uploads finish a large backup sooner. Each one stages a full-size copy on the device while it runs, so high values use more storage, battery and data at once — 2 suits most phones. Lowering it lets uploads already running finish first.\n\nStorage Saver asks Google Photos to reduce file size. With Count Against Storage Quota off, uploads identify as an older Pixel phone so they don't use your Google storage; the Google Photos app may then label them “Storage saver” even though the original file was kept. The file size, or Google Photos on the web, shows the real quality. Live Photos currently back up as still images.")
+            Text("More simultaneous uploads finish a large backup sooner. Each one stages a full-size copy on the device while it runs, so high values use more storage, battery and data at once — 2 suits most phones. Lowering it lets uploads already running finish first.\n\nStorage Saver asks Google Photos to reduce file size. With Count Against Storage Quota off, uploads identify as an older Pixel phone so they don't use your Google storage; the Google Photos app may then label them “Storage saver” even though the original file was kept. The file size, or Google Photos on the web, shows the real quality.\n\nBack Up Live Photo Motion attaches each Live Photo's motion to its photo, so it plays as a Live Photo in Google Photos and the Google Photos app's Free up space can remove it from this iPhone. It uploads the short video too, a few MB per Live Photo, and uses storage the same way the photo does. Live Photos backed up earlier get their motion added in the background.")
         }
     }
 

@@ -87,6 +87,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         self.albums = albums
         self.network = network
         self.libraryChanges = libraryChanges ?? PhotoLibraryChangeTracker()
+        queue.followUpSources = { [weak self] source in self?.motionFollowUps(after: source) ?? [] }
 
         registered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.taskIdentifier,
@@ -119,6 +120,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         queue.setICloudDownloadsAllowed(isForeground)
         await photos.start()
         await queueEditedVersionsOnce()
+        await queueLivePhotoMotion()
         applyNetworkPolicy()
         updateSchedule()
         runForegroundBackupIfNeeded()
@@ -147,7 +149,57 @@ final class AutomaticBackupCoordinator: ObservableObject {
         queue.activateAccount(account.status.email)
         updateSchedule()
         runForegroundBackupIfNeeded()
-        Task { await queueEditedVersionsOnce() }
+        Task {
+            await queueEditedVersionsOnce()
+            await queueLivePhotoMotion()
+        }
+    }
+
+    func livePhotoMotionPreferenceDidChange() {
+        Task { await queueLivePhotoMotion() }
+    }
+
+    /// A Live Photo's motion is committed onto its still, so it is queued once
+    /// the still is in the account: right after the still's row finishes.
+    private func motionFollowUps(after source: MediaSource) -> [MediaSource] {
+        guard preferences.backUpLivePhotoMotion, case .asset(let identifier) = source,
+              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
+              asset.mediaSubtypes.contains(.photoLive) else { return [] }
+        return [.livePhotoMotion(localIdentifier: identifier)]
+    }
+
+    /// Queue the motion of every Live Photo remembered as backed up whose motion
+    /// is not recorded yet, including those backed up before motion was
+    /// supported. Runs at each start: the enqueue skips rows already tracked, so
+    /// this only ever adds what is missing.
+    func queueLivePhotoMotion() async {
+        guard preferences.backUpLivePhotoMotion, let email = account.status.email, MediaLibrary.isReadable,
+              queue.persistenceWarning == nil else { return }
+        let completed = queue.completedSourceKeys
+        let identifiers = completed.compactMap { key -> String? in
+            guard key.hasPrefix("asset:") else { return nil }
+            let identifier = String(key.dropFirst("asset:".count))
+            return completed.contains(UploadQueue.motionKeyPrefix + identifier) ? nil : identifier
+        }
+        guard !identifiers.isEmpty else { return }
+        let motions = await Task.detached(priority: .utility) { () -> [MediaSource] in
+            var found: [MediaSource] = []
+            PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil).enumerateObjects { asset, _, _ in
+                if asset.mediaSubtypes.contains(.photoLive) {
+                    found.append(.livePhotoMotion(localIdentifier: asset.localIdentifier))
+                }
+            }
+            return found
+        }.value
+        // The library read runs off the main actor; the account or the setting can change meanwhile.
+        guard account.status.email == email, preferences.backUpLivePhotoMotion, !motions.isEmpty else { return }
+        let queued = queue.enqueue(motions, skippingExisting: true).count
+        if queued > 0 {
+            DiagnosticEventLog.shared.record(
+                "queue",
+                "Queued the motion of \(queued) Live Photo\(queued == 1 ? "" : "s") already backed up as a still, so it plays as a Live Photo and Google Photos can free it"
+            )
+        }
     }
 
     /// Earlier builds backed up an edited photo as its unedited original. The

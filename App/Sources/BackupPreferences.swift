@@ -32,6 +32,7 @@ final class BackupPreferences: ObservableObject {
         static let concurrentUploads = "backup.concurrentUploads"
         static let storageSaver = "backup.storageSaver"
         static let useQuota = "backup.useQuota"
+        static let backUpLivePhotoMotion = "backup.livePhotoMotion"
     }
 
     @Published var selectedAlbumIDs: Set<String> { didSet { saveAlbumIDs() } }
@@ -41,6 +42,7 @@ final class BackupPreferences: ObservableObject {
     @Published var concurrentUploads: Int { didSet { defaults.set(concurrentUploads, forKey: Key.concurrentUploads) } }
     @Published var storageSaver: Bool { didSet { defaults.set(storageSaver, forKey: Key.storageSaver) } }
     @Published var useQuota: Bool { didSet { defaults.set(useQuota, forKey: Key.useQuota) } }
+    @Published var backUpLivePhotoMotion: Bool { didSet { defaults.set(backUpLivePhotoMotion, forKey: Key.backUpLivePhotoMotion) } }
 
     private let defaults: UserDefaults
 
@@ -56,6 +58,10 @@ final class BackupPreferences: ObservableObject {
             defaults.object(forKey: Key.concurrentUploads) as? Int ?? 2)
         storageSaver = defaults.bool(forKey: Key.storageSaver)
         useQuota = defaults.bool(forKey: Key.useQuota)
+        // Off until asked for: turning it on uploads the motion of every Live
+        // Photo already backed up, a few MB each, which an update should not
+        // start on its own.
+        backUpLivePhotoMotion = defaults.bool(forKey: Key.backUpLivePhotoMotion)
     }
 
     func toggle(albumID: String) {

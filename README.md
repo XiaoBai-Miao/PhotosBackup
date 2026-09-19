@@ -32,6 +32,10 @@ without a desktop companion or hosted service.
 - Show per-album backup progress, and re-upload assets edited after backup.
 - Back up an edited photo as it looks on the iPhone, the file the Google Photos
   app would upload itself, so Google Photos' Free up space recognises it.
+- With Back Up Live Photo Motion on, back up a Live Photo with its motion
+  attached, so it plays as a Live Photo and the Google Photos app's Free up
+  space offers it. Live Photos backed up as a still earlier get their motion
+  added in the background.
 - Upload in original quality or request Google's Storage Saver processing.
 - Choose how many uploads run at once, from 1 to 10.
 - Enforce Wi-Fi-only or Wi-Fi-and-cellular policy at queue and request level,
@@ -233,8 +237,11 @@ Android master token → Photos access token → private Photos API
 ## Known limitations
 
 - Google can change or disable the private authentication and Photos endpoints.
-- Live Photos currently upload only their still image; the motion component is
-  ignored.
+- The Google Photos app's Free up space skips edited photos (including Live
+  Photos the camera saves with an adjustment, such as Portrait) when a
+  Google-side setting is on for the account, even when Google's own backup
+  uploaded them. Photos Backup backs them up in full, but cannot make Google
+  offer them for removal.
 - Background album backup is opportunistic: iOS decides when each processing
   request runs and may delay it based on usage, battery, and system policy.
 - Shortcuts can create extra backup opportunities on iOS 16+, but iOS gives
