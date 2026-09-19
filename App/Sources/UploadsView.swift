@@ -48,9 +48,13 @@ struct UploadsView: View {
         .navigationViewStyle(.stack)
     }
 
+    /// Photos picked by hand are checked against Google even when the app
+    /// remembers them as backed up: picking one is how someone asks "is this
+    /// really backed up?", and the hash lookup settles it without re-uploading
+    /// anything Google already has.
     private func enqueue(_ sources: [MediaSource]) {
         guard !sources.isEmpty else { return }
-        queue.enqueue(sources, skippingExisting: true)
+        queue.reverify(sources)
     }
 
     private var manualBackupSection: some View {
