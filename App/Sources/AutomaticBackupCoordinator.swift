@@ -1,4 +1,5 @@
 import BackgroundTasks
+import Combine
 import Foundation
 import OSLog
 import Photos
@@ -64,6 +65,16 @@ final class AutomaticBackupCoordinator: ObservableObject {
     /// runs on every background transition, and logging each resubmission would
     /// push the entries a report needs out of the timeline.
     private var loggedScheduleState: String?
+    /// iOS 26 and later: the continued-processing task that keeps the queue
+    /// running after the app leaves the foreground. Typed loosely because the
+    /// type itself needs iOS 26.
+    private var continuedSession: AnyObject?
+    private var continuedObservation: AnyCancellable?
+    /// A refused or expired request is not retried for a minute, so a queue
+    /// that changes every second does not resubmit every second.
+    private var continuedRetryAfter: Date?
+    /// The run-history record of the time spent in the background under it.
+    private var continuedRun: (id: UUID, settledBefore: Int)?
 #if DEBUG
     @Published private(set) var debugSimulationStatus = "Ready"
     static let lldbSimulationCommand = "e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@\"\(taskIdentifier)\"]"
@@ -88,6 +99,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         self.network = network
         self.libraryChanges = libraryChanges ?? PhotoLibraryChangeTracker()
         queue.followUpSources = { [weak self] source in self?.motionFollowUps(after: source) ?? [] }
+        if #available(iOS 26.0, *) { setUpContinuedBackup() }
 
         registered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.taskIdentifier,
@@ -124,6 +136,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         applyNetworkPolicy()
         updateSchedule()
         runForegroundBackupIfNeeded()
+        refreshContinuedBackup()
     }
 
     func networkDidChange() {
@@ -237,24 +250,36 @@ final class AutomaticBackupCoordinator: ObservableObject {
 
     func applicationDidEnterBackground() {
         cancelForegroundScan()
-        // Anything still exporting is about to be frozen, not crashed.
-        queue.setPreparationGuardArmed(false)
-        queue.flushPendingWrites()
         isForeground = false
-        queue.setICloudDownloadsAllowed(false)
+        let continuing = continuesInBackground
+        if continuing {
+            // iOS keeps the app running under the continued task, so the work
+            // carries on, at a load a background process can hold.
+            queue.setMaxConcurrent(min(preferences.concurrentUploads, ContinuedBackupPolicy.backgroundConcurrencyLimit))
+            AppSessionTracker.note(.backgroundWork)
+            beginContinuedRun()
+        } else {
+            // Anything still exporting is about to be frozen, not crashed.
+            queue.setPreparationGuardArmed(false)
+            queue.setICloudDownloadsAllowed(false)
+        }
+        queue.flushPendingWrites()
         shouldRunAfterActivation = true
         updateSchedule()
         let transferring = queue.runningBackgroundTransferCount
         DiagnosticEventLog.shared.record(
             "lifecycle",
             "Left the app with \(queue.activeCount) unfinished, \(transferring) transferring in iOS"
-                + (queue.activeCount > transferring ? "; the rest waits for a background window or the next launch" : "")
+                + (continuing ? "; iOS keeps the backup running in the background"
+                    : queue.activeCount > transferring ? "; the rest waits for a background window or the next launch" : "")
         )
         DiagnosticEventLog.shared.flush()
     }
 
     func applicationDidBecomeActive() {
         isForeground = true
+        finishContinuedRun(success: true, ending: "the app was opened")
+        queue.setMaxConcurrent(preferences.concurrentUploads)
         queue.setPreparationGuardArmed(true)
         queue.setICloudDownloadsAllowed(true)
         queue.resumeSystemWork()
@@ -267,6 +292,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
             "Opened the app; \(queue.activeCount) unfinished, \(queue.failedCount) failed"
         )
         runForegroundBackupIfNeeded()
+        refreshContinuedBackup()
     }
 
     func applyNetworkPolicy() {
@@ -320,7 +346,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
         case .tooManyPendingTaskRequests:
             return "iOS already holds too many pending requests from this app"
         case .notPermitted:
-            return "this build does not declare the task identifier in its Info.plist"
+            return "this build does not declare the task identifier in its Info.plist, or background activity is turned off for this app"
+        case .immediateRunIneligible:
+            // A continued-processing request asked to run now or not at all.
+            return "iOS is too busy to start it right now"
         @unknown default:
             return error.localizedDescription
         }
@@ -566,7 +595,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         loggedScheduleState = nil
         updateSchedule()
         queue.setPreparationGuardArmed(true)
-        queue.setICloudDownloadsAllowed(false)
+        if !continuesInBackground { queue.setICloudDownloadsAllowed(false) }
         queue.resumeSystemWork()
         backgroundOperation?.cancel()
 
@@ -577,8 +606,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
             }
             let report = await self.performBackgroundBackup()
             AutomaticBackupRunHistory.finished(run, success: report.success, summary: report.summary)
-            self.queue.setPreparationGuardArmed(self.isForeground)
-            if !self.isForeground { AppSessionTracker.note(.background) }
+            // A continued backup keeps the process running after the window.
+            let keepsRunning = self.isForeground || self.continuesInBackground
+            self.queue.setPreparationGuardArmed(keepsRunning)
+            if !keepsRunning { AppSessionTracker.note(.background) }
             // iOS may suspend the process as soon as the task completes.
             DiagnosticEventLog.shared.flush()
             task?.expirationHandler = nil
@@ -596,7 +627,11 @@ final class AutomaticBackupCoordinator: ObservableObject {
                 level: .warning
             )
             operation.cancel()
-            Task { @MainActor [weak self] in self?.queue.suspendForBackgroundExpiration() }
+            Task { @MainActor [weak self] in
+                // The queue keeps going when a continued backup holds the app.
+                guard let self, !self.continuesInBackground else { return }
+                self.queue.suspendForBackgroundExpiration()
+            }
         }
         task.expirationHandler = expire
         // iOS may already have expired the window while this hop was queued.
@@ -751,7 +786,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
             isForeground = false
             AppSessionTracker.note(.backgroundWork)
             queue.setPreparationGuardArmed(true)
-            queue.setICloudDownloadsAllowed(false)
+            if !continuesInBackground { queue.setICloudDownloadsAllowed(false) }
         }
         queue.resumeSystemWork()
         updateSchedule()
@@ -764,7 +799,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         // Requeue whatever has not reached iOS's transfer service, so it resumes
         // at the next opportunity instead of freezing mid-export. With the app
         // open, the foreground simply carries on.
-        if UIApplication.shared.applicationState != .active {
+        if UIApplication.shared.applicationState != .active, !continuesInBackground {
             if !queue.isIdle { queue.suspendForBackgroundExpiration() }
             queue.setPreparationGuardArmed(false)
             AppSessionTracker.note(.background)
@@ -816,7 +851,9 @@ final class AutomaticBackupCoordinator: ObservableObject {
     func handleBackgroundURLSessionEvents() async {
         let run = AutomaticBackupRunHistory.started(.backgroundTransfer, context: executionContext())
         isForeground = UIApplication.shared.applicationState == .active
-        if !isForeground {
+        // Under a continued backup the process is running anyway: treat the
+        // wake like the open app and leave the queue as it is.
+        if !isForeground, !continuesInBackground {
             AppSessionTracker.note(.backgroundWork)
             // Filter before restoration so `activateAccount`'s internal pump
             // cannot start fresh exports, and pause network so nothing pumps
@@ -829,12 +866,12 @@ final class AutomaticBackupCoordinator: ObservableObject {
         _ = await network.waitForInitialStatus()
         applyNetworkPolicy()
         isForeground = UIApplication.shared.applicationState == .active
-        queue.setICloudDownloadsAllowed(isForeground)
-        if isForeground { queue.resumeSystemWork() }
+        if !continuesInBackground { queue.setICloudDownloadsAllowed(isForeground) }
+        if isForeground || continuesInBackground { queue.resumeSystemWork() }
         else { queue.resumeBackgroundTransferCompletions() }
         await queue.waitUntilBackgroundTransfersHandled()
         isForeground = UIApplication.shared.applicationState == .active
-        if isForeground { queue.resumeSystemWork() }
+        if isForeground || continuesInBackground { queue.resumeSystemWork() }
         else {
             queue.finishBackgroundTransferCompletions()
             AppSessionTracker.note(.background)
@@ -864,6 +901,153 @@ final class AutomaticBackupCoordinator: ObservableObject {
         }
     }
 #endif
+}
+
+// MARK: - Continued backup (iOS 26)
+
+extension AutomaticBackupCoordinator {
+    /// True while a continued-processing task iOS has started keeps the app
+    /// running in the background. A request iOS has not started yet does not
+    /// count: leaving the app then has to hand over as it always did.
+    var continuesInBackground: Bool {
+        guard #available(iOS 26.0, *), let session = continuedSession as? ContinuedBackupSession else { return false }
+        return session.isRunning
+    }
+
+    @available(iOS 26.0, *)
+    private func setUpContinuedBackup() {
+        let session = ContinuedBackupSession()
+        session.onExpired = { [weak self] in self?.continuedBackupExpired() }
+        session.onStarted = { [weak self] in self?.continuedBackupStarted() }
+        continuedSession = session
+        // At most once a second: start a task when work appears while the app
+        // is open, move its progress, and end it once the queue cannot move.
+        continuedObservation = queue.objectWillChange
+            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshContinuedBackup() }
+            }
+    }
+
+    private var queueCanMoveOnItsOwn: Bool {
+        ContinuedBackupPolicy.shouldContinue(
+            hasWorkableItems: queue.hasWorkableItems,
+            userPaused: queue.isUserPaused,
+            halted: queue.haltReason != nil,
+            networkPaused: queue.networkPauseReason != nil,
+            systemPaused: queue.systemPauseReason != nil
+        )
+    }
+
+    func refreshContinuedBackup() {
+        guard #available(iOS 26.0, *), let session = continuedSession as? ContinuedBackupSession else { return }
+        if session.isOverdue {
+            continuedRetryAfter = Date().addingTimeInterval(60)
+            DiagnosticEventLog.shared.record(
+                "scheduler",
+                "iOS accepted the request to keep the backup running but did not start it; trying again later",
+                level: .warning
+            )
+            session.finish(success: false)
+            return
+        }
+        if session.isActive {
+            guard queueCanMoveOnItsOwn else { return endContinuedBackup(session) }
+            let progress = ContinuedBackupProgress(settledSinceStart: queue.settledRowCount - session.settledAtStart,
+                                                   unfinished: queue.activeCount)
+            let waiting = queue.rateLimitPauseReason == nil ? nil : "Waiting: Google asked the app to slow down"
+            session.update(progress, subtitle: progress.subtitle(waitingFor: waiting))
+            return
+        }
+        // iOS accepts the request only from the app in the foreground.
+        guard UIApplication.shared.applicationState == .active, queueCanMoveOnItsOwn,
+              account.status.isUsable else { return }
+        if let retryAfter = continuedRetryAfter, Date() < retryAfter { return }
+        let permitted = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
+        guard let prefix = ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: Bundle.main.bundleIdentifier,
+                                                                  permitted: permitted) else { return }
+        let progress = ContinuedBackupProgress(settledSinceStart: 0, unfinished: queue.activeCount)
+        do {
+            try session.start(prefix: prefix, settledNow: queue.settledRowCount, subtitle: progress.subtitle(waitingFor: nil))
+            continuedRetryAfter = nil
+            DiagnosticEventLog.shared.record(
+                "scheduler",
+                "Asked iOS to keep the backup running if the app leaves the foreground; \(queue.activeCount) unfinished"
+            )
+        } catch {
+            continuedRetryAfter = Date().addingTimeInterval(60)
+            DiagnosticEventLog.shared.record(
+                "scheduler",
+                "iOS would not keep the backup running in the background: \(Self.explainSchedulingError(error)). It continues while the app is open",
+                level: .warning
+            )
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private func endContinuedBackup(_ session: ContinuedBackupSession) {
+        let idle = queue.isIdle
+        let reason = idle ? "nothing is left to back up" : (queue.pauseReason ?? "nothing can move on its own")
+        finishContinuedRun(success: idle, ending: reason)
+        DiagnosticEventLog.shared.record("scheduler", "Ended the background continuation: \(reason)")
+        if UIApplication.shared.applicationState != .active { settleIntoSuspension() }
+        // iOS may suspend the app as soon as it hears the task is over.
+        DiagnosticEventLog.shared.flush()
+        session.finish(success: idle && queue.haltReason == nil)
+    }
+
+    /// iOS normally starts the task while the app is open. If it started it
+    /// only after the app left, take up the background settings now.
+    private func continuedBackupStarted() {
+        guard UIApplication.shared.applicationState == .background else { return }
+        queue.setMaxConcurrent(min(preferences.concurrentUploads, ContinuedBackupPolicy.backgroundConcurrencyLimit))
+        queue.setPreparationGuardArmed(true)
+        AppSessionTracker.note(.backgroundWork)
+        beginContinuedRun()
+    }
+
+    /// Runs before iOS is told the task is over; unfinished work is requeued
+    /// the same way as when a processing window expires.
+    private func continuedBackupExpired() {
+        continuedRetryAfter = Date().addingTimeInterval(60)
+        DiagnosticEventLog.shared.record(
+            "scheduler",
+            "iOS ended the background continuation — cancelled in the Live Activity, or iOS needed the resources; unfinished work stays queued",
+            level: .warning
+        )
+        finishContinuedRun(success: false, ending: "iOS ended it")
+        if UIApplication.shared.applicationState != .active {
+            queue.suspendForBackgroundExpiration()
+            settleIntoSuspension()
+        }
+        DiagnosticEventLog.shared.flush()
+    }
+
+    /// The hand-over leaving the foreground makes when nothing keeps the app
+    /// running, for when the continued task ends in the background.
+    private func settleIntoSuspension() {
+        queue.setPreparationGuardArmed(false)
+        queue.setICloudDownloadsAllowed(false)
+        queue.flushPendingWrites()
+        AppSessionTracker.note(.background)
+    }
+
+    private func beginContinuedRun() {
+        guard continuedRun == nil else { return }
+        let id = AutomaticBackupRunHistory.started(.continued, context: executionContext())
+        continuedRun = (id, queue.settledRowCount)
+    }
+
+    private func finishContinuedRun(success: Bool, ending: String) {
+        guard let run = continuedRun else { return }
+        continuedRun = nil
+        let settled = max(0, queue.settledRowCount - run.settledBefore)
+        AutomaticBackupRunHistory.finished(
+            run.id,
+            success: success,
+            summary: "finished \(settled) item\(settled == 1 ? "" : "s"); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)"
+        )
+    }
 }
 
 /// Bridges the gap between a `BGProcessingTask` arriving on a system queue and

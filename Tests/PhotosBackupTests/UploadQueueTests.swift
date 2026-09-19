@@ -162,6 +162,18 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(queue.items.map(\.state), [.done, .done])
     }
 
+    func testSettledRowsKeepCountingWhenFinishedRowsAreCleared() async {
+        let script = WorkerScript([.succeed(.uploaded(mediaKey: "A")),
+                                   .fail(GPMCError(kind: .server(400), message: "rejected")),
+                                   .succeed(.alreadyBackedUp(mediaKey: "B"))])
+        let queue = makeQueue(script, maxConcurrent: 1, maxAttempts: 1)
+        queue.enqueue(sources(3))
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.settledRowCount, 3, "done, failed and already backed up all settle a row")
+        queue.clearFinished()
+        XCTAssertEqual(queue.settledRowCount, 3)
+    }
+
     func testAlreadyBackedUpIsItsOwnTerminalState() async {
         let script = WorkerScript([.succeed(.alreadyBackedUp(mediaKey: "OLD"))])
         let queue = makeQueue(script)

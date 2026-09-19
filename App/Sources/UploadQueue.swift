@@ -173,6 +173,10 @@ final class UploadQueue: ObservableObject {
     /// in memory only, and read by Diagnostics.
     @Published private(set) var recentFailures: [UploadFailure] = []
     @Published private(set) var failureCount = 0
+    /// Rows that reached a finished state in this session. It only grows, so
+    /// progress measured from it stays monotonic when Clear Finished takes
+    /// rows away.
+    private(set) var settledRowCount = 0
     private static let recentFailureLimit = 25
 
     /// Called once when Google refuses the credential, so the account state can follow.
@@ -272,6 +276,7 @@ final class UploadQueue: ObservableObject {
     /// and the scan cursor cannot drift away from `items`.
     private func setState(_ state: UploadItem.State, at index: Int) {
         let id = items[index].id
+        if state.isFinished, !items[index].state.isFinished { settledRowCount += 1 }
         tally(items[index].state, by: -1)
         tally(state, by: 1)
         items[index].state = state

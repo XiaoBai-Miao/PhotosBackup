@@ -40,6 +40,10 @@ without a desktop companion or hosted service.
 - Choose how many uploads run at once, from 1 to 10.
 - Enforce Wi-Fi-only or Wi-Fi-and-cellular policy at queue and request level,
   cancelling in-flight background transfers when the allowed transport is lost.
+- Keep backing up after you leave the app, on iOS 26 and later. While the app
+  is open with work queued, it asks iOS to continue that work in the
+  background; iOS shows the progress in a Live Activity, where it can be
+  cancelled. In the background at most 2 uploads run at once.
 - Request recurring iOS background-processing windows for selected-album backup.
 - Expose a **Back Up Photos** Shortcuts action on iOS 16+ for charger,
   time-of-day, Wi-Fi, and other personal automations. It runs even with
@@ -75,6 +79,7 @@ the Keychain round trip, which needs a signed build, are skipped.
 | --- | --- |
 | App bundle ID | `com.g8row.photosbackup` |
 | Background task | `com.g8row.photosbackup.background-backup` |
+| Continued backup (iOS 26+) | `<bundle ID>.continued-backup.*` |
 | Background upload session | `com.g8row.photosbackup.background-upload` |
 
 > [!IMPORTANT]
@@ -244,6 +249,10 @@ Android master token → Photos access token → private Photos API
   offer them for removal.
 - Background album backup is opportunistic: iOS decides when each processing
   request runs and may delay it based on usage, battery, and system policy.
+- Continuing after you leave the app needs iOS 26, and iOS accepts the request
+  only while the app is open. iOS can still end it early to reclaim resources,
+  and ends it when the app is swiped away in the app switcher; unfinished work
+  waits for the next time the app runs.
 - Shortcuts can create extra backup opportunities on iOS 16+, but iOS gives
   each run about 30 seconds. The action queues durable work and gives prepared
   file transfers to the background URL session; it is not a periodic guarantee.
@@ -308,6 +317,7 @@ Never commit tokens or captured account credentials.
 ```text
 App/Sources/                  SwiftUI app, onboarding, account, and upload queue
 App/Sources/AutomaticBackupCoordinator.swift  BGProcessingTask scheduling
+App/Sources/ContinuedBackup.swift             iOS 26 continued backup after leaving the app
 App/Sources/BackgroundUploadTransport.swift   Relaunch-safe file PUT transport
 App/Sources/PhotoLibraryChangeTracker.swift   Persistent PhotoKit scan token
 App/Sources/NetworkPolicy.swift               Wi-Fi-only / cellular enforcement
