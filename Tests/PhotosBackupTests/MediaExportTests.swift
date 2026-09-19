@@ -1,3 +1,4 @@
+import Photos
 import XCTest
 @testable import PhotosBackup
 
@@ -13,6 +14,42 @@ final class MediaExportTests: XCTestCase {
         try contents.write(to: url)
         addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
         return url
+    }
+
+    /// The Google Photos app only counts a photo on the iPhone as backed up when
+    /// the account holds the file it would upload itself — the rendered edit for
+    /// an edited asset. Observed on device on 2026-09-18: an edited Live Photo
+    /// backed up as its original never counted; as its rendered edit, it did.
+    func testAnEditedAssetUploadsItsRenderedEditBeforeTheOriginal() {
+        XCTAssertEqual(MediaExporter.uploadResourceTypes(for: .image, edited: true), [.fullSizePhoto, .photo])
+        XCTAssertEqual(MediaExporter.uploadResourceTypes(for: .image, edited: false), [.photo, .fullSizePhoto])
+        XCTAssertEqual(MediaExporter.uploadResourceTypes(for: .video, edited: true), [.fullSizeVideo, .video])
+        XCTAssertEqual(MediaExporter.uploadResourceTypes(for: .video, edited: false), [.video, .fullSizeVideo])
+
+        for type in [PHAssetMediaType.image, .video, .unknown] {
+            for edited in [true, false] {
+                let types = MediaExporter.uploadResourceTypes(for: type, edited: edited)
+                XCTAssertFalse(types.contains(.pairedVideo), "Live Photo motion is not uploaded")
+                XCTAssertFalse(types.contains(.fullSizePairedVideo), "Live Photo motion is not uploaded")
+            }
+        }
+    }
+
+    /// An edited video keeps a rendered still beside its rendered video. Seen on
+    /// device on 2026-09-19: an edited-first list shared by photos and videos
+    /// uploaded that still as "IMG_0116.JPG" in place of the video.
+    func testAnEditedVideoNeverUploadsTheStillKeptBesideIt() {
+        XCTAssertFalse(MediaExporter.uploadResourceTypes(for: .video, edited: true).contains(.fullSizePhoto))
+        XCTAssertFalse(MediaExporter.uploadResourceTypes(for: .video, edited: false).contains(.fullSizePhoto))
+        XCTAssertFalse(MediaExporter.uploadResourceTypes(for: .image, edited: true).contains(.fullSizeVideo))
+    }
+
+    func testARenderedEditIsUploadedUnderTheOriginalName() {
+        XCTAssertEqual(MediaExporter.uploadFilename(original: "IMG_0351.HEIC", rendition: "FullSizeRender.heic"), "IMG_0351.HEIC")
+        XCTAssertEqual(MediaExporter.uploadFilename(original: "IMG_0007.PNG", rendition: "FullSizeRender.heic"), "IMG_0007.HEIC")
+        XCTAssertEqual(MediaExporter.uploadFilename(original: "clip.mov", rendition: "FullSizeRender.mp4"), "clip.mp4")
+        XCTAssertEqual(MediaExporter.uploadFilename(original: "IMG_4242.HEIC", rendition: "IMG_4242.HEIC"), "IMG_4242.HEIC")
+        XCTAssertEqual(MediaExporter.uploadFilename(original: nil, rendition: "FullSizeRender.jpg"), "FullSizeRender.jpg")
     }
 
     func testExportingAnExistingFileKeepsItsNameSizeAndDate() async throws {

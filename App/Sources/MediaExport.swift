@@ -137,19 +137,55 @@ actor MediaExporter {
         try? FileManager.default.removeItem(at: media.url.deletingLastPathComponent())
     }
 
+    /// The resource to upload, in order of preference: the one the Google Photos
+    /// app would upload itself. That is the rendered edit for an edited asset and
+    /// the original otherwise, and its Free up space only counts a photo on this
+    /// iPhone as backed up when the account holds those exact bytes — an edited
+    /// photo backed up as its original never qualifies. This includes the many
+    /// Live Photos the camera saves with an adjustment already applied.
+    ///
+    /// The list follows the asset's media type. An edited video keeps a
+    /// rendered still (`.fullSizePhoto`) beside its rendered video; a single
+    /// edited-first list uploaded that still in place of the video, so the
+    /// Google Photos app never counted the video as backed up (seen on device
+    /// on 2026-09-19).
+    ///
+    /// `.pairedVideo` / `.fullSizePairedVideo` are the Live Photo motion track.
+    /// Live Photos are a follow-up (ADR-001), so only the still or the plain
+    /// video is uploaded here.
+    static func uploadResourceTypes(for mediaType: PHAssetMediaType, edited: Bool) -> [PHAssetResourceType] {
+        let photo: [PHAssetResourceType] = edited ? [.fullSizePhoto, .photo] : [.photo, .fullSizePhoto]
+        let video: [PHAssetResourceType] = edited ? [.fullSizeVideo, .video] : [.video, .fullSizeVideo]
+        switch mediaType {
+        case .image: return photo
+        case .video: return video
+        default: return photo + video
+        }
+    }
+
+    /// A rendered edit is named `FullSizeRender.heic`. Upload it under the
+    /// original's name instead, with the rendition's file type.
+    static func uploadFilename(original: String?, rendition: String) -> String {
+        guard let original, !original.isEmpty else { return rendition }
+        let originalType = (original as NSString).pathExtension
+        let renditionType = (rendition as NSString).pathExtension
+        guard !renditionType.isEmpty, renditionType.lowercased() != originalType.lowercased() else { return original }
+        let type = originalType == originalType.uppercased() ? renditionType.uppercased() : renditionType.lowercased()
+        return (original as NSString).deletingPathExtension + "." + type
+    }
+
     private func exportAsset(_ identifier: String, allowsNetworkAccess: Bool) async throws -> ExportedMedia {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject else {
             throw Failure.missingAsset
         }
         let resources = PHAssetResource.assetResources(for: asset)
-        // `.pairedVideo` / `.fullSizePairedVideo` are the Live Photo motion
-        // track. Live Photos are a follow-up (ADR-001), so only the still or the
-        // plain video is uploaded here.
-        let preferred: [PHAssetResourceType] = [.photo, .video, .fullSizePhoto, .fullSizeVideo]
+        let preferred = Self.uploadResourceTypes(for: asset.mediaType, edited: asset.hasAdjustments)
         guard let resource = preferred.compactMap({ type in resources.first { $0.type == type } }).first else {
             throw resources.isEmpty ? Failure.noResource : Failure.liveOnly
         }
-        let destination = try Self.stage(named: resource.originalFilename)
+        let original = resources.first { $0.type == .photo || $0.type == .video }?.originalFilename
+        let filename = Self.uploadFilename(original: original, rendition: resource.originalFilename)
+        let destination = try Self.stage(named: filename)
         let options = PHAssetResourceRequestOptions()
         options.isNetworkAccessAllowed = allowsNetworkAccess
         do {
@@ -166,7 +202,7 @@ actor MediaExporter {
             throw Failure.unreadable(error.localizedDescription)
         }
         do {
-            return try describe(destination, filename: resource.originalFilename,
+            return try describe(destination, filename: filename,
                                 modified: asset.creationDate ?? asset.modificationDate, temporary: true)
         } catch {
             // `describe` rejects an empty file. The write itself succeeded, so

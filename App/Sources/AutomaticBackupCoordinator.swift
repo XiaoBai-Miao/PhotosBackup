@@ -1,6 +1,7 @@
 import BackgroundTasks
 import Foundation
 import OSLog
+import Photos
 import UIKit
 
 /// Owns opportunistic automatic-backup runs in both foreground and system
@@ -39,6 +40,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
     /// When the pending processing request was submitted, so the log can say
     /// how long iOS took to honour it.
     static let lastRequestSubmittedKey = "diagnostics.scheduler.lastSubmittedAt"
+
+    /// Per-account flag: edited photos that earlier builds backed up as their
+    /// original have been queued again so their edited version is backed up.
+    static let editedVersionsQueuedKey = "backup.editedVersionsQueued.v1."
 
     private let photos: PhotosStack
     private let account: PhotosAccount
@@ -113,6 +118,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         queue.setPreparationGuardArmed(isForeground)
         queue.setICloudDownloadsAllowed(isForeground)
         await photos.start()
+        await queueEditedVersionsOnce()
         applyNetworkPolicy()
         updateSchedule()
         runForegroundBackupIfNeeded()
@@ -141,6 +147,40 @@ final class AutomaticBackupCoordinator: ObservableObject {
         queue.activateAccount(account.status.email)
         updateSchedule()
         runForegroundBackupIfNeeded()
+        Task { await queueEditedVersionsOnce() }
+    }
+
+    /// Earlier builds backed up an edited photo as its unedited original. The
+    /// Google Photos app never matches that to the photo on this iPhone, so its
+    /// Free up space never offered it. Once per account, queue every edited
+    /// photo already remembered as backed up so its edited version goes up; the
+    /// hash lookup settles any whose edited bytes Google Photos already holds.
+    private func queueEditedVersionsOnce() async {
+        // Each early return leaves the flag unset so a later launch tries again:
+        // without library access nothing can be read, and a completion ledger
+        // that failed to load reads as empty rather than as nothing to do.
+        guard let email = account.status.email, MediaLibrary.isReadable,
+              queue.persistenceWarning == nil else { return }
+        let flag = Self.editedVersionsQueuedKey + email.lowercased()
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        let identifiers = queue.completedSourceKeys.compactMap { key in
+            key.hasPrefix("asset:") ? String(key.dropFirst("asset:".count)) : nil
+        }
+        let edited = await Task.detached(priority: .utility) { () -> [MediaSource] in
+            var found: [MediaSource] = []
+            PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil).enumerateObjects { asset, _, _ in
+                if asset.hasAdjustments { found.append(.asset(localIdentifier: asset.localIdentifier)) }
+            }
+            return found
+        }.value
+        // The library read runs off the main actor; the account can change meanwhile.
+        guard account.status.email == email else { return }
+        let result = queue.reverify(edited)
+        UserDefaults.standard.set(true, forKey: flag)
+        DiagnosticEventLog.shared.record(
+            "queue",
+            "Queued \(result.enqueued) edited photo\(result.enqueued == 1 ? "" : "s") that were backed up as their original, so the edited version Google Photos looks for is backed up too"
+        )
     }
 
     func applicationDidEnterBackground() {

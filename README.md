@@ -30,6 +30,8 @@ without a desktop companion or hosted service.
 - Restore pending album uploads after an app restart and remember completed
   library assets per Google account.
 - Show per-album backup progress, and re-upload assets edited after backup.
+- Back up an edited photo as it looks on the iPhone, the file the Google Photos
+  app would upload itself, so Google Photos' Free up space recognises it.
 - Upload in original quality or request Google's Storage Saver processing.
 - Choose how many uploads run at once, from 1 to 10.
 - Enforce Wi-Fi-only or Wi-Fi-and-cellular policy at queue and request level,
