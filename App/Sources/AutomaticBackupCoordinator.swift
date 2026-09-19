@@ -46,6 +46,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
     /// original have been queued again so their edited version is backed up.
     static let editedVersionsQueuedKey = "backup.editedVersionsQueued.v1."
 
+    /// Per-account flag: the base version of photos edited in the Google Photos
+    /// app and already backed up has been queued.
+    static let editBasesQueuedKey = "backup.editBasesQueued.v1."
+
     private let photos: PhotosStack
     private let account: PhotosAccount
     private let queue: UploadQueue
@@ -98,7 +102,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
         self.albums = albums
         self.network = network
         self.libraryChanges = libraryChanges ?? PhotoLibraryChangeTracker()
-        queue.followUpSources = { [weak self] source in self?.motionFollowUps(after: source) ?? [] }
+        queue.followUpSources = { [weak self] source in
+            guard let self else { return [] }
+            return self.motionFollowUps(after: source) + self.editBaseFollowUps(after: source)
+        }
         if #available(iOS 26.0, *) { setUpContinuedBackup() }
 
         registered = BGTaskScheduler.shared.register(
@@ -132,6 +139,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         queue.setICloudDownloadsAllowed(isForeground)
         await photos.start()
         await queueEditedVersionsOnce()
+        await queueEditBasesOnce()
         await queueLivePhotoMotion()
         applyNetworkPolicy()
         updateSchedule()
@@ -164,6 +172,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         runForegroundBackupIfNeeded()
         Task {
             await queueEditedVersionsOnce()
+            await queueEditBasesOnce()
             await queueLivePhotoMotion()
         }
     }
@@ -179,6 +188,43 @@ final class AutomaticBackupCoordinator: ObservableObject {
               let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
               asset.mediaSubtypes.contains(.photoLive) else { return [] }
         return [.livePhotoMotion(localIdentifier: identifier)]
+    }
+
+    /// A photo edited in the Google Photos app also needs the version that edit
+    /// was applied on, which is what that app checks. Queued after the photo.
+    private func editBaseFollowUps(after source: MediaSource) -> [MediaSource] {
+        guard case .asset(let identifier) = source,
+              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
+              MediaExporter.hasEditBase(asset) else { return [] }
+        return [.editBase(localIdentifier: identifier)]
+    }
+
+    /// Once per account, queue the edit base of every photo already remembered
+    /// as backed up. New photos get theirs as a follow-up.
+    private func queueEditBasesOnce() async {
+        // Each early return leaves the flag unset so a later launch tries again.
+        guard let email = account.status.email, MediaLibrary.isReadable,
+              queue.persistenceWarning == nil else { return }
+        let flag = Self.editBasesQueuedKey + email.lowercased()
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        let identifiers = queue.completedSourceKeys.compactMap { key in
+            key.hasPrefix("asset:") ? String(key.dropFirst("asset:".count)) : nil
+        }
+        let bases = await Task.detached(priority: .utility) { () -> [MediaSource] in
+            var found: [MediaSource] = []
+            PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil).enumerateObjects { asset, _, _ in
+                if MediaExporter.hasEditBase(asset) { found.append(.editBase(localIdentifier: asset.localIdentifier)) }
+            }
+            return found
+        }.value
+        // The library read runs off the main actor; the account can change meanwhile.
+        guard account.status.email == email else { return }
+        let queued = queue.enqueue(bases, skippingExisting: true).count
+        UserDefaults.standard.set(true, forKey: flag)
+        DiagnosticEventLog.shared.record(
+            "queue",
+            "Queued the pre-edit version of \(queued) photo\(queued == 1 ? "" : "s") edited in the Google Photos app, which that app checks before it counts them as backed up"
+        )
     }
 
     /// Queue the motion of every Live Photo remembered as backed up whose motion

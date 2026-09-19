@@ -597,6 +597,43 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(restored.items.first?.source, .livePhotoMotion(localIdentifier: "live-1"))
     }
 
+    /// A photo edited in the Google Photos app also backs up the version that
+    /// edit was applied on. Like a motion, it adds to a photo already counted.
+    func testAGoogleEditedPhotoQueuesItsEditBaseWithoutCountingIt() async {
+        let queue = makeQueue(WorkerScript([]), maxConcurrent: 1)
+        queue.followUpSources = { source in
+            guard case .asset(let identifier) = source, identifier == "edited-1" else { return [] }
+            return [.editBase(localIdentifier: identifier)]
+        }
+        queue.enqueue([.asset(localIdentifier: "edited-1"), .asset(localIdentifier: "plain-1")])
+        await settle(queue) { queue.items.count == 3 && queue.items.allSatisfy { $0.state == .done } }
+        XCTAssertEqual(queue.items.last?.source, .editBase(localIdentifier: "edited-1"))
+        XCTAssertEqual(queue.completedSourceCount, 2)
+        XCTAssertTrue(queue.completedSourceKeys.contains(UploadQueue.editBaseKeyPrefix + "edited-1"))
+    }
+
+    /// An edit-base row restores as one, never as a motion row: committing a
+    /// photo as a Live Photo's motion would write a bad item to the account.
+    func testAnEditBaseRowRestoresAsAnEditBaseRow() async {
+        let persistence = MemoryUploadQueuePersistence()
+        let first = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        first.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        first.activateAccount("person@gmail.com")
+        first.enqueue([.editBase(localIdentifier: "edited-1"), .livePhotoMotion(localIdentifier: "live-1")],
+                      skippingExisting: true)
+
+        let stored = persistence.snapshot?.items ?? []
+        XCTAssertEqual(stored.map(\.source), [.asset("edited-1"), .asset("live-1")])
+        XCTAssertEqual(stored.map(\.editBase), [true, nil])
+        XCTAssertEqual(stored.map(\.motion), [nil, true])
+
+        let restored = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        restored.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        restored.activateAccount("person@gmail.com")
+        XCTAssertEqual(restored.items.map(\.source), [.editBase(localIdentifier: "edited-1"),
+                                                      .livePhotoMotion(localIdentifier: "live-1")])
+    }
+
     func testAMotionCheckpointKeepsItsStillHash() throws {
         let checkpoint = UploadCheckpoint(filePath: "/tmp/staged/IMG.MOV", filename: "IMG.MOV",
                                           modified: Date(timeIntervalSince1970: 100), byteCount: 123,

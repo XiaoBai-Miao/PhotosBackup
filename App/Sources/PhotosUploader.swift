@@ -130,6 +130,11 @@ struct PhotosUploader {
                     // the row rather than leave a failure nobody can act on.
                     DiagnosticEventLog.shared.record("upload", "A Live Photo had no motion left to back up, so its motion row finished without uploading")
                     return .alreadyBackedUp(mediaKey: "")
+                } catch MediaExporter.Failure.noEditBase {
+                    // Stacked on an edit that is not the Google Photos app's, or
+                    // since reverted: nothing to add. Settle the row.
+                    DiagnosticEventLog.shared.record("upload", "A photo had no Google Photos edit to back up the base of, so its row finished without uploading")
+                    return .alreadyBackedUp(mediaKey: "")
                 }
                 if media.byteCount >= largeItemThreshold {
                     DiagnosticEventLog.shared.record(
@@ -147,7 +152,14 @@ struct PhotosUploader {
                     continuesAfterProcessExit: await client.usesBackgroundFileTransfers,
                     pairedStillHash: media.pairedStillHash
                 )
-                let name = media.pairedStillHash == nil ? media.filename : "\(media.filename) (Live Photo motion)"
+                let name: String
+                if media.pairedStillHash != nil {
+                    name = "\(media.filename) (Live Photo motion)"
+                } else if case .editBase = source {
+                    name = "\(media.filename) (before Google Photos edit)"
+                } else {
+                    name = media.filename
+                }
                 await emit(.described(name: name, byteCount: media.byteCount))
                 await emit(.checkpoint(checkpoint))
             }

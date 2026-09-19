@@ -21,6 +21,13 @@ enum MediaSource: Equatable, Sendable {
     /// video, attached to the still already backed up so the item plays as a
     /// Live Photo and the Google Photos app's Free up space can offer it.
     case livePhotoMotion(localIdentifier: String)
+    /// The version of the photo with this `PHAsset` identifier that the Google
+    /// Photos app's own edit was applied on (`.adjustmentBasePhoto`): the
+    /// camera's Portrait blur or crop, before Google's edit. The Google Photos
+    /// app counts a photo it edited as backed up only once the account holds
+    /// this version (seen on device on 2026-09-19); the finished edit and the
+    /// original do not count.
+    case editBase(localIdentifier: String)
 }
 
 /// A picked item with no resolvable asset id. Wraps the provider so the file
@@ -54,6 +61,7 @@ actor MediaExporter {
         case unreadable(String)
         case liveOnly
         case noMotion
+        case noEditBase
         case iCloudDownloadRequired
         var errorDescription: String? {
             switch self {
@@ -61,6 +69,7 @@ actor MediaExporter {
             case .noResource: return "That item has no file to upload."
             case .liveOnly: return "That item is a Live Photo motion track, which this release does not upload."
             case .noMotion: return "That Live Photo has no motion to back up."
+            case .noEditBase: return "That photo has no Google Photos edit to back up the base of."
             case .iCloudDownloadRequired: return "That item is only in iCloud. It will continue when the app is open."
             case .unreadable(let detail): return "Could not read that item: \(detail)"
             }
@@ -140,6 +149,8 @@ actor MediaExporter {
             return try describe(url, filename: url.lastPathComponent, modified: nil, temporary: true)
         case .livePhotoMotion(let identifier):
             return try await exportMotion(identifier, allowsNetworkAccess: allowsNetworkAccess)
+        case .editBase(let identifier):
+            return try await exportEditBase(identifier, allowsNetworkAccess: allowsNetworkAccess)
         }
     }
 
@@ -204,6 +215,51 @@ actor MediaExporter {
         let original = resources.first { $0.type == .photo || $0.type == .video }?.originalFilename
         let filename = Self.uploadFilename(original: original, rendition: resource.originalFilename)
         return try await stage(resource, as: filename, of: asset, allowsNetworkAccess: allowsNetworkAccess)
+    }
+
+    /// The format the Google Photos app records its own edits in.
+    static let googlePhotosEditFormat = "com.google.photos.editing.filtering.nondestructive"
+
+    /// Whether a photo carries a version an edit was stacked on. Reads only the
+    /// resource list; the export confirms the edit is the Google Photos app's.
+    /// Photos edited only by the camera or in Apple Photos have none.
+    static func hasEditBase(_ asset: PHAsset) -> Bool {
+        asset.mediaType == .image && asset.hasAdjustments
+            && PHAssetResource.assetResources(for: asset).contains { $0.type == .adjustmentBasePhoto }
+    }
+
+    /// The version a Google Photos edit was applied on, staged under the
+    /// original's name. Any other stacked edit settles without an upload: the
+    /// Google Photos app is only known to check this version for its own.
+    private func exportEditBase(_ identifier: String, allowsNetworkAccess: Bool) async throws -> ExportedMedia {
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject else {
+            throw Failure.missingAsset
+        }
+        let resources = PHAssetResource.assetResources(for: asset)
+        guard let base = resources.first(where: { $0.type == .adjustmentBasePhoto }),
+              let adjustment = resources.first(where: { $0.type == .adjustmentData }),
+              await Self.adjustmentFormat(of: adjustment) == Self.googlePhotosEditFormat else {
+            throw Failure.noEditBase
+        }
+        let original = resources.first { $0.type == .photo }?.originalFilename
+        let filename = Self.uploadFilename(original: original, rendition: base.originalFilename)
+        return try await stage(base, as: filename, of: asset, allowsNetworkAccess: allowsNetworkAccess)
+    }
+
+    /// `adjustmentFormatIdentifier` from an asset's adjustment plist, or nil.
+    private static func adjustmentFormat(of resource: PHAssetResource) async -> String? {
+        let collector = DataCollector()
+        let finished: Bool = await withCheckedContinuation { continuation in
+            PHAssetResourceManager.default().requestData(for: resource, options: nil) { chunk in
+                collector.append(chunk)
+            } completionHandler: { error in
+                continuation.resume(returning: error == nil)
+            }
+        }
+        guard finished,
+              let plist = try? PropertyListSerialization.propertyList(from: collector.data, format: nil) as? [String: Any]
+        else { return nil }
+        return plist["adjustmentFormatIdentifier"] as? String
     }
 
     /// A Live Photo's paired video, plus the hash of the still it belongs to.
@@ -402,4 +458,12 @@ private final class PhotoResourceRequestCancellation: @unchecked Sendable {
         lock.unlock()
         if let requestID { manager.cancelDataRequest(requestID) }
     }
+}
+
+/// Gathers a small resource's bytes as `requestData` delivers them.
+private final class DataCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var buffer = Data()
+    var data: Data { lock.lock(); defer { lock.unlock() }; return buffer }
+    func append(_ chunk: Data) { lock.lock(); buffer.append(chunk); lock.unlock() }
 }

@@ -8,9 +8,11 @@ enum PersistedMediaSource: Codable, Equatable, Sendable {
 
     init?(_ source: MediaSource) {
         switch source {
-        // A motion row is stored as its asset plus `PersistedUploadItem.motion`,
-        // so a snapshot stays readable by builds that predate motion rows.
-        case .asset(let identifier), .livePhotoMotion(let identifier): self = .asset(identifier)
+        // Motion and edit-base rows are stored as their asset plus a flag on
+        // `PersistedUploadItem`, so a snapshot stays readable by builds that
+        // predate them.
+        case .asset(let identifier), .livePhotoMotion(let identifier), .editBase(let identifier):
+            self = .asset(identifier)
         case .file(let url): self = .file(url.standardizedFileURL.path)
         case .picked: return nil
         }
@@ -63,11 +65,14 @@ struct PersistedUploadItem: Codable, Equatable, Sendable {
     /// True for a Live Photo motion row, whose `source` is the Live Photo's asset.
     /// Nil otherwise, so ordinary rows are encoded exactly as before.
     let motion: Bool?
+    /// True for a Google Photos edit-base row, stored the same way as a motion
+    /// row. Never set together with `motion`.
+    let editBase: Bool?
 
     init(id: UUID, source: PersistedMediaSource, name: String, byteCount: Int64,
          attempts: Int, failureReason: String?, failureRetryable: Bool,
          checkpoint: UploadCheckpoint? = nil, cancelled: Bool? = nil,
-         interruptedPreparations: Int? = nil, motion: Bool? = nil) {
+         interruptedPreparations: Int? = nil, motion: Bool? = nil, editBase: Bool? = nil) {
         self.id = id
         self.source = source
         self.name = name
@@ -79,10 +84,14 @@ struct PersistedUploadItem: Codable, Equatable, Sendable {
         self.cancelled = cancelled
         self.interruptedPreparations = interruptedPreparations
         self.motion = motion
+        self.editBase = editBase
     }
 
     var mediaSource: MediaSource {
-        if motion == true, case .asset(let identifier) = source { return .livePhotoMotion(localIdentifier: identifier) }
+        if case .asset(let identifier) = source {
+            if motion == true { return .livePhotoMotion(localIdentifier: identifier) }
+            if editBase == true { return .editBase(localIdentifier: identifier) }
+        }
         return source.mediaSource
     }
 }

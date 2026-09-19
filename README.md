@@ -36,6 +36,10 @@ without a desktop companion or hosted service.
   attached, so it plays as a Live Photo and the Google Photos app's Free up
   space offers it. Live Photos backed up as a still earlier get their motion
   added in the background.
+- Back up a photo edited in the Google Photos app so that app counts it as
+  backed up. Google Photos applies its own edit on top of the camera's
+  Portrait blur or crop, and only counts the photo once the account holds that
+  in-between version, so it is uploaded in addition to the finished edit.
 - Upload in original quality or request Google's Storage Saver processing.
 - Choose how many uploads run at once, from 1 to 10.
 - Enforce Wi-Fi-only or Wi-Fi-and-cellular policy at queue and request level,

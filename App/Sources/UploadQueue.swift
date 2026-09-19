@@ -106,7 +106,13 @@ private extension MediaSource {
         case .file(let url): return "file:\(url.standardizedFileURL.path)"
         case .picked: return nil
         case .livePhotoMotion(let identifier): return UploadQueue.motionKeyPrefix + identifier
+        case .editBase(let identifier): return UploadQueue.editBaseKeyPrefix + identifier
         }
+    }
+
+    var isEditBase: Bool {
+        if case .editBase = self { return true }
+        return false
     }
 
     var isLivePhotoMotion: Bool {
@@ -607,9 +613,17 @@ final class UploadQueue: ObservableObject {
     /// set, so re-verifying an item that is already in the cloud re-records the
     /// same key and the total does not move.
     ///
-    /// Live Photo motions are recorded in the same ledger under their own key
-    /// but are not counted: they add to a photo already counted here.
-    var completedSourceCount: Int { completedSourceKeys.count - completedMotionCount }
+    /// Live Photo motions and Google Photos edit bases are recorded in the same
+    /// ledger under their own keys but are not counted: they add to a photo
+    /// already counted here.
+    var completedSourceCount: Int {
+        completedSourceKeys.count - completedSourceKeys.lazy.filter {
+            $0.hasPrefix(Self.motionKeyPrefix) || $0.hasPrefix(Self.editBaseKeyPrefix)
+        }.count
+    }
+
+    /// Ledger prefix of a Google Photos edit's base version, keyed by asset.
+    nonisolated static let editBaseKeyPrefix = "editbase:"
 
     /// Ledger prefix of a Live Photo motion, keyed by its asset identifier.
     nonisolated static let motionKeyPrefix = "motion:"
@@ -1209,6 +1223,7 @@ final class UploadQueue: ObservableObject {
                     ?? item.checkpoint.map({ .file($0.filePath) }) else { return nil }
             let interruptions = item.interruptedPreparations > 0 ? item.interruptedPreparations : nil
             let motion: Bool? = item.source.isLivePhotoMotion ? true : nil
+            let editBase: Bool? = item.source.isEditBase ? true : nil
             switch item.state {
             case .alreadyBackedUp, .done:
                 return nil
@@ -1218,20 +1233,20 @@ final class UploadQueue: ObservableObject {
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
-                                           checkpoint: nil, cancelled: true, motion: motion)
+                                           checkpoint: nil, cancelled: true, motion: motion, editBase: editBase)
             case .failed(let reason, let retryable):
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: reason, failureRetryable: retryable,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions, motion: motion)
+                                           interruptedPreparations: interruptions, motion: motion, editBase: editBase)
             default:
                 // Working and retry-delay states intentionally restore queued.
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions, motion: motion)
+                                           interruptedPreparations: interruptions, motion: motion, editBase: editBase)
             }
         }
         let snapshot = UploadQueueSnapshot(
