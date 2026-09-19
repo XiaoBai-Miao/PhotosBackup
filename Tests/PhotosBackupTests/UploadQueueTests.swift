@@ -213,13 +213,29 @@ final class UploadQueueTests: XCTestCase {
     }
 
     func testExporterFailureIsReportedVerbatimAndNotRetried() async {
-        let script = WorkerScript([.fail(MediaExporter.Failure.missingAsset)])
+        let script = WorkerScript([.fail(MediaExporter.Failure.noResource)])
         let queue = makeQueue(script, maxConcurrent: 1)
         queue.enqueue(oneSource)
         await settle(queue) { queue.items.first?.state.isFinished == true }
         XCTAssertEqual(queue.items.first?.state,
-                       .failed(reason: "That item is no longer in your photo library.", retryable: false))
+                       .failed(reason: "That item has no file to upload.", retryable: false))
         XCTAssertEqual(script.calls, 1)
+    }
+
+    /// Freeing space deletes photos that may still be queued. Seen on device:
+    /// about 2,000 rows failed "no longer in your photo library" after a
+    /// library was cleared mid-run. Such a row is dropped, not failed.
+    func testARowWhosePhotoWasDeletedIsDroppedNotFailed() async {
+        let script = WorkerScript([.fail(MediaExporter.Failure.missingAsset)])
+        let queue = makeQueue(script, maxConcurrent: 1)
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.items.count, 1, "the deleted photo's row is gone")
+        XCTAssertEqual(queue.items.first?.state, .done)
+        XCTAssertEqual(queue.failedCount, 0)
+        XCTAssertEqual(queue.settledRowCount, 1)
+        XCTAssertEqual(script.calls, 2)
+        assertAggregatesMatchRows(queue)
     }
 
     func testCredentialRejectionHaltsTheQueueAndLeavesWorkRequeued() async {

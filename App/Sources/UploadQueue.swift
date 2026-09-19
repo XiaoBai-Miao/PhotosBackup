@@ -1047,6 +1047,21 @@ final class UploadQueue: ObservableObject {
                 )
                 return
             }
+            if error as? MediaExporter.Failure == .missingAsset {
+                // Deleted from the photo library while it waited — which is what
+                // freeing space on the iPhone does to rows still queued for the
+                // same photos. Nothing is left to back up and nothing needs the
+                // user: drop the row rather than fail it.
+                cleanCheckpoint(for: index)
+                items.remove(at: index)
+                rebuildDerivedState()
+                persist()
+                DiagnosticEventLog.shared.record(
+                    "queue",
+                    "Dropped a queued item that was deleted from the photo library before it was backed up"
+                )
+                return
+            }
             let gpmc = error as? GPMCError
             let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             // A refused credential and a full account both mean no other item
