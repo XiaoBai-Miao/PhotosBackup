@@ -150,6 +150,15 @@ final class UploadQueue: ObservableObject {
     @Published private(set) var networkPauseReason: String?
     /// Set when iOS ends a background execution window before the queue drains.
     @Published private(set) var systemPauseReason: String?
+    /// Set while Google refuses requests for going over its per-minute limit
+    /// (HTTP 429). Every row shares that limit, so the whole queue waits it out:
+    /// a row retrying a second or two later only meets the same refusal, and
+    /// fails once its attempts run out. Clears itself when the wait ends.
+    @Published private(set) var rateLimitPauseReason: String?
+    private var rateLimitTask: Task<Void, Never>?
+    private var rateLimitDelay = UploadQueue.rateLimitBaseDelay
+    static let rateLimitBaseDelay: Double = 60
+    static let rateLimitMaxDelay: Double = 600
     /// A durable user pause. Current uploads finish; new uploads wait.
     /// Resets the scan cursor: a pause changes which rows count as startable,
     /// so rows the scan already skipped have to be reconsidered.
@@ -341,6 +350,7 @@ final class UploadQueue: ObservableObject {
             ?? (isUserPaused ? "You paused backup. Tap Resume to continue." : nil)
             ?? networkPauseReason
             ?? systemPauseReason
+            ?? rateLimitPauseReason
     }
     var retainedStagingURLs: Set<URL> { Set(items.compactMap { $0.checkpoint?.fileURL }) }
     var retainedTransferIDs: Set<UUID> {
@@ -677,6 +687,7 @@ final class UploadQueue: ObservableObject {
         completionLedgerHealthy = true
         haltReason = nil
         systemPauseReason = nil
+        endRateLimitPause()
         isUserPaused = false
         persistenceWarning = nil
 
@@ -897,7 +908,8 @@ final class UploadQueue: ObservableObject {
     // MARK: - Scheduling
 
     private func pump() {
-        guard haltReason == nil, networkPauseReason == nil, systemPauseReason == nil else { return }
+        guard haltReason == nil, networkPauseReason == nil, systemPauseReason == nil,
+              rateLimitPauseReason == nil else { return }
         while running.count < maxConcurrent, let index = nextStartableIndex() {
             start(at: index)
         }
@@ -977,6 +989,7 @@ final class UploadQueue: ObservableObject {
             items[index].mediaKey = result.mediaKey
             setState(settled, at: index)
             if let key = items[index].source.queueDeduplicationKey { completedSourceKeys.insert(key) }
+            rateLimitDelay = Self.rateLimitBaseDelay
             items[index].checkpoint = nil
             recordCompletion(for: items[index])
             persist()
@@ -1026,6 +1039,15 @@ final class UploadQueue: ObservableObject {
                 setState(.queued, at: index)
                 persist()
                 halt(gpmc)
+                return
+            }
+            if case .server(429)? = gpmc?.kind {
+                // Google's limit, not this row's fault: give the attempt back
+                // and requeue the row behind the pause.
+                items[index].attempts = max(0, items[index].attempts - 1)
+                setState(.queued, at: index)
+                persist()
+                pauseForRateLimit(reason)
                 return
             }
             let retryable = gpmc?.isRetryable ?? false
@@ -1106,6 +1128,40 @@ final class UploadQueue: ObservableObject {
             requeueCancelled.insert(id)
             task.cancel()
         }
+    }
+
+    /// Stop starting rows until Google's per-minute limit has had time to reset.
+    /// The wait doubles while Google keeps refusing, up to ten minutes, and
+    /// drops back to a minute after the next success.
+    private func pauseForRateLimit(_ reason: String) {
+        // Rows already in flight when the limit hit come back here too; one
+        // pause covers them all.
+        guard rateLimitTask == nil else { return }
+        let delay = rateLimitDelay
+        rateLimitDelay = min(Self.rateLimitMaxDelay, rateLimitDelay * 2)
+        let minutes = Int(delay / 60)
+        rateLimitPauseReason = "Google asked the app to slow down. Backup continues in "
+            + (minutes <= 1 ? "a minute." : "\(minutes) minutes.")
+        DiagnosticEventLog.shared.record(
+            "queue",
+            "Google limited how many requests the app may make, so new work waits \(Int(delay)) s: \(reason)",
+            level: .warning
+        )
+        let sleeper = self.sleeper
+        rateLimitTask = Task { [weak self] in
+            await sleeper(delay)
+            guard let self, !Task.isCancelled else { return }
+            self.rateLimitTask = nil
+            self.rateLimitPauseReason = nil
+            self.pump()
+        }
+    }
+
+    private func endRateLimitPause() {
+        rateLimitTask?.cancel()
+        rateLimitTask = nil
+        rateLimitPauseReason = nil
+        rateLimitDelay = Self.rateLimitBaseDelay
     }
 
     private func scheduleRetry(_ id: UUID, after seconds: Double) {

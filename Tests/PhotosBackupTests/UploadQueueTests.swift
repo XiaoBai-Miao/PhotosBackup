@@ -44,6 +44,22 @@ private extension NSLock {
     func sync<T>(_ body: () -> T) -> T { lock(); defer { unlock() }; return body() }
 }
 
+/// A queue sleeper that records each requested delay and holds every sleeper
+/// until the test opens it.
+final class SleepGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var delays: [Double] = []
+    var requested: [Double] { lock.sync { delays } }
+
+    func open() { lock.sync { isOpen = true } }
+
+    func sleep(_ seconds: Double) async {
+        lock.sync { delays.append(seconds) }
+        while !lock.sync({ isOpen }) { try? await Task.sleep(nanoseconds: 2_000_000) }
+    }
+}
+
 @MainActor
 final class UploadQueueTests: XCTestCase {
 
@@ -107,6 +123,43 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(queue.items.first?.name, "IMG_1.JPG")
         XCTAssertEqual(queue.items.first?.byteCount, 1234)
         XCTAssertTrue(queue.isIdle)
+    }
+
+    func testARateLimitedRowPausesTheQueueInsteadOfFailing() async {
+        let limited = GPMCError(kind: .server(429), message: "Google returned HTTP 429 during duplicate check.")
+        let script = WorkerScript([.fail(limited)])
+        let gate = SleepGate()
+        // One attempt: without the pause, the first refusal would fail the row.
+        let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
+                                sleeper: { await gate.sleep($0) })
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.rateLimitPauseReason != nil }
+        XCTAssertEqual(queue.items.map(\.state), [.queued, .queued])
+        XCTAssertEqual(queue.pauseReason, queue.rateLimitPauseReason)
+        XCTAssertEqual(gate.requested, [UploadQueue.rateLimitBaseDelay])
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(script.calls, 1, "nothing starts while Google's limit is in force")
+
+        gate.open()
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.items.map(\.state), [.done, .done])
+        XCTAssertNil(queue.rateLimitPauseReason)
+        XCTAssertEqual(queue.failedCount, 0)
+        assertAggregatesMatchRows(queue)
+    }
+
+    func testTheRateLimitPauseGrowsWhileGoogleKeepsRefusingAndResetsAfterASuccess() async {
+        let limited = GPMCError(kind: .server(429), message: "Google returned HTTP 429 during duplicate check.")
+        let script = WorkerScript([.fail(limited), .fail(limited), .succeed(.uploaded(mediaKey: "A")), .fail(limited)])
+        let gate = SleepGate()
+        gate.open()
+        let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
+                                sleeper: { await gate.sleep($0) })
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.isIdle }
+        let base = UploadQueue.rateLimitBaseDelay
+        XCTAssertEqual(gate.requested, [base, base * 2, base])
+        XCTAssertEqual(queue.items.map(\.state), [.done, .done])
     }
 
     func testAlreadyBackedUpIsItsOwnTerminalState() async {
