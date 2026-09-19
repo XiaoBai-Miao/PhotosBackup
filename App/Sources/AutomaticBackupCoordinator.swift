@@ -948,7 +948,7 @@ extension AutomaticBackupCoordinator {
                 "iOS accepted the request to keep the backup running but did not start it; trying again later",
                 level: .warning
             )
-            session.finish(success: false)
+            session.finish()
             return
         }
         if session.isActive {
@@ -993,7 +993,7 @@ extension AutomaticBackupCoordinator {
         if UIApplication.shared.applicationState != .active { settleIntoSuspension() }
         // iOS may suspend the app as soon as it hears the task is over.
         DiagnosticEventLog.shared.flush()
-        session.finish(success: idle && queue.haltReason == nil)
+        session.finish()
     }
 
     /// iOS normally starts the task while the app is open. If it started it
@@ -1010,9 +1010,13 @@ extension AutomaticBackupCoordinator {
     /// the same way as when a processing window expires.
     private func continuedBackupExpired() {
         continuedRetryAfter = Date().addingTimeInterval(60)
+        var lastItem = "no item had finished yet"
+        if #available(iOS 26.0, *), let finished = (continuedSession as? ContinuedBackupSession)?.lastItemFinishedAt {
+            lastItem = "the last item finished \(Int(Date().timeIntervalSince(finished).rounded())) s earlier"
+        }
         DiagnosticEventLog.shared.record(
             "scheduler",
-            "iOS ended the background continuation — cancelled in the Live Activity, or iOS needed the resources; unfinished work stays queued",
+            "iOS ended the background continuation — Stop in the Live Activity, or iOS needed the CPU, memory or temperature headroom back; \(lastItem); \(DiagnosticProcessInfo.thermal(ProcessInfo.processInfo.thermalState)) thermal state. Unfinished work stays queued",
             level: .warning
         )
         finishContinuedRun(success: false, ending: "iOS ended it")

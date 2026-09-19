@@ -50,6 +50,23 @@ struct ContinuedBackupProgress: Equatable {
     func subtitle(waitingFor reason: String?) -> String {
         reason ?? "\(completed.formatted()) of \(total.formatted()) done"
     }
+
+    /// Units iOS sees per queue item, so a heartbeat can move the reported
+    /// progress while an item is in flight without reaching the next one.
+    static let unitsPerItem: Int64 = 1000
+
+    /// The completed units to report next. iOS expires a continued task whose
+    /// progress has not moved for about 30 s (Apple DTS, developer forums
+    /// thread 805554), and one queue item can take longer than that — a slow
+    /// upload, a retry, a wait on Google's rate limit. Apple's advice is to
+    /// report progress artificially in that case, so a heartbeat adds one unit,
+    /// always staying inside the item in flight; real progress jumps ahead.
+    func nextReported(after reported: Int64, heartbeat: Bool) -> Int64 {
+        let floor = completed * Self.unitsPerItem
+        let ceiling = max(floor, min((completed + 1) * Self.unitsPerItem - 1, total * Self.unitsPerItem))
+        let next = max(reported, floor) + (heartbeat ? 1 : 0)
+        return min(max(next, floor), ceiling)
+    }
 }
 
 /// Keeps the upload queue running after the app leaves the foreground, through
@@ -86,6 +103,12 @@ final class ContinuedBackupSession {
     private var task: BGContinuedProcessingTask?
     private var lastSubtitle: String?
     private(set) var settledAtStart = 0
+    private var latest = ContinuedBackupProgress(settledSinceStart: 0, unfinished: 0)
+    private var reported: Int64 = 0
+    private var heartbeat: Task<Void, Never>?
+    /// When an item last finished, for the log when iOS ends the task.
+    private(set) var lastItemFinishedAt: Date?
+    static let heartbeatInterval: UInt64 = 5_000_000_000
 
     func start(prefix: String, settledNow: Int, subtitle: String) throws {
         let identifier = prefix + UUID().uuidString
@@ -116,6 +139,9 @@ final class ContinuedBackupSession {
         self.identifier = identifier
         submittedAt = Date()
         settledAtStart = settledNow
+        latest = ContinuedBackupProgress(settledSinceStart: 0, unfinished: 0)
+        reported = 0
+        lastItemFinishedAt = nil
         lastSubtitle = subtitle
         do {
             try BGTaskScheduler.shared.submit(request)
@@ -126,21 +152,34 @@ final class ContinuedBackupSession {
     }
 
     func update(_ progress: ContinuedBackupProgress, subtitle: String) {
-        guard let task else { return }
-        task.progress.totalUnitCount = max(1, progress.total)
-        task.progress.completedUnitCount = min(progress.completed, max(1, progress.total))
-        if subtitle != lastSubtitle {
-            lastSubtitle = subtitle
-            task.updateTitle(Self.title, subtitle: subtitle)
-        }
+        if progress.completed > latest.completed { lastItemFinishedAt = Date() }
+        latest = progress
+        report(heartbeat: false)
+        guard let task, subtitle != lastSubtitle else { return }
+        lastSubtitle = subtitle
+        task.updateTitle(Self.title, subtitle: subtitle)
     }
 
-    func finish(success: Bool) {
+    /// End the task. Always as a success: the flag tells iOS what to do with
+    /// the Live Activity, not whether the backup finished (Apple DTS, developer
+    /// forums thread 808756). False leaves a "Task Failed" card on screen until
+    /// iOS clears it, and unfinished work stays queued either way. When iOS
+    /// itself ends the task, it shows that card before the app hears about it.
+    func finish() {
+        heartbeat?.cancel()
+        heartbeat = nil
         let task = self.task
         self.task = nil
         identifier = nil
         task?.expirationHandler = nil
-        task?.setTaskCompleted(success: success)
+        task?.setTaskCompleted(success: true)
+    }
+
+    private func report(heartbeat: Bool) {
+        guard let task else { return }
+        reported = latest.nextReported(after: reported, heartbeat: heartbeat)
+        task.progress.totalUnitCount = max(1, latest.total * ContinuedBackupProgress.unitsPerItem)
+        task.progress.completedUnitCount = reported
     }
 
     private func adopt(_ task: BGContinuedProcessingTask, window: BackgroundWindow) {
@@ -150,12 +189,19 @@ final class ContinuedBackupSession {
         }
         task.expirationHandler = expire
         window.adopt(expire)
+        heartbeat = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.heartbeatInterval)
+                guard !Task.isCancelled, let self else { return }
+                self.report(heartbeat: true)
+            }
+        }
         onStarted?()
     }
 
     private func expired() {
         guard task != nil else { return }
         onExpired?()
-        finish(success: false)
+        finish()
     }
 }
