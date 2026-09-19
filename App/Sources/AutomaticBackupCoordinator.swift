@@ -10,7 +10,20 @@ import UIKit
 /// every invocation submits its successor so the work remains recurring.
 @MainActor
 final class AutomaticBackupCoordinator: ObservableObject {
-    static let taskIdentifier = "com.g8row.photosbackup.background-backup"
+    /// The processing task's identifier as this install declares it. SideStore
+    /// renames the bundle when it signs the app and rewrites the identifiers in
+    /// `BGTaskSchedulerPermittedIdentifiers` to match
+    /// (`…photosbackup.background-backup` → `…photosbackup.<TEAMID>.background-backup`);
+    /// registering the build-time name there was rejected as "not advertised in
+    /// the application's Info.plist" (seen on device, 2026-09-19).
+    nonisolated static let taskIdentifier: String = resolveTaskIdentifier(
+        permitted: Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
+    )
+    nonisolated static let builtTaskIdentifier = "com.g8row.photosbackup.background-backup"
+
+    nonisolated static func resolveTaskIdentifier(permitted: [String]) -> String {
+        permitted.first { $0.hasSuffix(".background-backup") && !$0.hasSuffix("*") } ?? builtTaskIdentifier
+    }
     private nonisolated static let logger = Logger(subsystem: "com.g8row.photosbackup", category: "automatic-backup")
 
     /// How many sources one background enqueue pass may append. This bounds
@@ -106,7 +119,9 @@ final class AutomaticBackupCoordinator: ObservableObject {
             guard let self else { return [] }
             return self.motionFollowUps(after: source) + self.editBaseFollowUps(after: source)
         }
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) { setUpContinuedBackup() }
+        #endif
 
         registered = BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.taskIdentifier,
@@ -124,12 +139,16 @@ final class AutomaticBackupCoordinator: ObservableObject {
             task.expirationHandler = { window.expire() }
             Task { @MainActor [weak self] in self?.begin(task, window: window) }
         }
+        let declared = (Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? [])
+            .joined(separator: ", ")
         if !registered {
             DiagnosticEventLog.shared.record(
                 "scheduler",
-                "Could not register the background task handler, so iOS cannot start background backups in this build",
+                "Could not register the background task handler for \(Self.taskIdentifier), so iOS cannot start background backups in this build; Info.plist declares \(declared)",
                 level: .error
             )
+        } else {
+            DiagnosticEventLog.shared.record("scheduler", "Registered the background task handler for \(Self.taskIdentifier); Info.plist declares \(declared)")
         }
     }
 
@@ -393,9 +412,11 @@ final class AutomaticBackupCoordinator: ObservableObject {
             return "iOS already holds too many pending requests from this app"
         case .notPermitted:
             return "this build does not declare the task identifier in its Info.plist, or background activity is turned off for this app"
+        #if compiler(>=6.2)
         case .immediateRunIneligible:
             // A continued-processing request asked to run now or not at all.
             return "iOS is too busy to start it right now"
+        #endif
         @unknown default:
             return error.localizedDescription
         }
@@ -956,10 +977,15 @@ extension AutomaticBackupCoordinator {
     /// running in the background. A request iOS has not started yet does not
     /// count: leaving the app then has to hand over as it always did.
     var continuesInBackground: Bool {
+        #if compiler(>=6.2)
         guard #available(iOS 26.0, *), let session = continuedSession as? ContinuedBackupSession else { return false }
         return session.isRunning
+        #else
+        return false
+        #endif
     }
 
+    #if compiler(>=6.2)
     @available(iOS 26.0, *)
     private func setUpContinuedBackup() {
         let session = ContinuedBackupSession()
@@ -974,6 +1000,7 @@ extension AutomaticBackupCoordinator {
                 Task { @MainActor [weak self] in self?.refreshContinuedBackup() }
             }
     }
+    #endif
 
     private var queueCanMoveOnItsOwn: Bool {
         ContinuedBackupPolicy.shouldContinue(
@@ -986,6 +1013,7 @@ extension AutomaticBackupCoordinator {
     }
 
     func refreshContinuedBackup() {
+        #if compiler(>=6.2)
         guard #available(iOS 26.0, *), let session = continuedSession as? ContinuedBackupSession else { return }
         if session.isOverdue {
             continuedRetryAfter = Date().addingTimeInterval(60)
@@ -1010,26 +1038,35 @@ extension AutomaticBackupCoordinator {
               account.status.isUsable else { return }
         if let retryAfter = continuedRetryAfter, Date() < retryAfter { return }
         let permitted = Bundle.main.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String] ?? []
-        guard let prefix = ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: Bundle.main.bundleIdentifier,
-                                                                  permitted: permitted) else { return }
+        let prefixes = ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: Bundle.main.bundleIdentifier,
+                                                                permitted: permitted)
+        guard !prefixes.isEmpty else { return }
         let progress = ContinuedBackupProgress(settledSinceStart: 0, unfinished: queue.activeCount)
-        do {
-            try session.start(prefix: prefix, settledNow: queue.settledRowCount, subtitle: progress.subtitle(waitingFor: nil))
-            continuedRetryAfter = nil
-            DiagnosticEventLog.shared.record(
-                "scheduler",
-                "Asked iOS to keep the backup running if the app leaves the foreground; \(queue.activeCount) unfinished"
-            )
-        } catch {
-            continuedRetryAfter = Date().addingTimeInterval(60)
-            DiagnosticEventLog.shared.record(
-                "scheduler",
-                "iOS would not keep the backup running in the background: \(Self.explainSchedulingError(error)). It continues while the app is open",
-                level: .warning
-            )
+        var refusals: [String] = []
+        for prefix in prefixes {
+            do {
+                try session.start(prefix: prefix, settledNow: queue.settledRowCount, subtitle: progress.subtitle(waitingFor: nil))
+                continuedRetryAfter = nil
+                DiagnosticEventLog.shared.record(
+                    "scheduler",
+                    "Asked iOS to keep the backup running if the app leaves the foreground, as \(prefix)*; \(queue.activeCount) unfinished"
+                        + (refusals.isEmpty ? "" : "; refused first: " + refusals.joined(separator: "; "))
+                )
+                return
+            } catch {
+                refusals.append("\(prefix)*: \(Self.explainSchedulingError(error))")
+            }
         }
+        continuedRetryAfter = Date().addingTimeInterval(60)
+        DiagnosticEventLog.shared.record(
+            "scheduler",
+            "iOS would not keep the backup running in the background (\(refusals.joined(separator: "; "))). It continues while the app is open",
+            level: .warning
+        )
+        #endif
     }
 
+    #if compiler(>=6.2)
     @available(iOS 26.0, *)
     private func endContinuedBackup(_ session: ContinuedBackupSession) {
         let idle = queue.isIdle
@@ -1041,6 +1078,7 @@ extension AutomaticBackupCoordinator {
         DiagnosticEventLog.shared.flush()
         session.finish()
     }
+    #endif
 
     /// iOS normally starts the task while the app is open. If it started it
     /// only after the app left, take up the background settings now.
@@ -1057,9 +1095,11 @@ extension AutomaticBackupCoordinator {
     private func continuedBackupExpired() {
         continuedRetryAfter = Date().addingTimeInterval(60)
         var lastItem = "no item had finished yet"
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *), let finished = (continuedSession as? ContinuedBackupSession)?.lastItemFinishedAt {
             lastItem = "the last item finished \(Int(Date().timeIntervalSince(finished).rounded())) s earlier"
         }
+        #endif
         DiagnosticEventLog.shared.record(
             "scheduler",
             "iOS ended the background continuation — Stop in the Live Activity, or iOS needed the CPU, memory or temperature headroom back; \(lastItem); \(DiagnosticProcessInfo.thermal(ProcessInfo.processInfo.thermalState)) thermal state. Unfinished work stays queued",

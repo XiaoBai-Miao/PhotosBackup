@@ -24,16 +24,26 @@ enum ContinuedBackupPolicy {
         hasWorkableItems && !userPaused && !halted && !networkPaused && !systemPaused
     }
 
-    /// The identifier prefix to submit under, from the Info.plist entries. iOS
-    /// wants the bundle ID at the front, so an entry that starts with the
-    /// running bundle ID wins; a sideloading tool that renames the bundle but
-    /// not the plist leaves only the build-time one, which is still worth a try.
-    static func identifierPrefix(bundleIdentifier: String?, permitted: [String]) -> String? {
-        let prefixes = permitted.filter { $0.hasSuffix(identifierMarker) }.map { String($0.dropLast()) }
-        if let bundleIdentifier, let own = prefixes.first(where: { $0.hasPrefix(bundleIdentifier + ".") }) {
-            return own
+    /// The identifier prefixes to submit under, best first. iOS wants the
+    /// running bundle ID at the front of a continued-processing identifier, and
+    /// the identifier has to match an Info.plist wildcard. SideStore renames the
+    /// bundle when it signs the app (`com.example.app` → `com.example.app.TEAMID`)
+    /// but leaves the plist as built, so the build-time entry is tried when no
+    /// entry covers the running bundle ID. Do not add a broad `<bundle ID>.*`
+    /// entry to cover it: it also covers the processing task's identifier, and
+    /// with it iOS refused to register that task's handler (seen on device,
+    /// 2026-09-19).
+    static func identifierPrefixes(bundleIdentifier: String?, permitted: [String]) -> [String] {
+        let wildcards = permitted.filter { $0.hasSuffix(".*") }.map { String($0.dropLast()) }
+        var prefixes: [String] = []
+        if let bundleIdentifier {
+            let own = bundleIdentifier + ".continued-backup."
+            if wildcards.contains(where: { own.hasPrefix($0) }) { prefixes.append(own) }
         }
-        return prefixes.first
+        for wildcard in wildcards where wildcard.hasSuffix(identifierMarker.dropLast()) && !prefixes.contains(wildcard) {
+            prefixes.append(wildcard)
+        }
+        return prefixes
     }
 }
 
@@ -69,6 +79,9 @@ struct ContinuedBackupProgress: Equatable {
     }
 }
 
+// The API arrived with the iOS 26 SDK (Swift 6.2, Xcode 26); older toolchains
+// build without it, and the app behaves as it did before.
+#if compiler(>=6.2)
 /// Keeps the upload queue running after the app leaves the foreground, through
 /// an iOS 26 continued-processing task. iOS shows its progress in a Live
 /// Activity, where it can also be cancelled. Without one, iOS suspends the app
@@ -205,3 +218,4 @@ final class ContinuedBackupSession {
         finish()
     }
 }
+#endif

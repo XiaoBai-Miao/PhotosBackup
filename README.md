@@ -83,7 +83,7 @@ the Keychain round trip, which needs a signed build, are skipped.
 | --- | --- |
 | App bundle ID | `com.g8row.photosbackup` |
 | Background task | `com.g8row.photosbackup.background-backup` |
-| Continued backup (iOS 26+) | `<bundle ID>.continued-backup.*` |
+| Continued backup (iOS 26+) | `<bundle ID>.continued-backup.<UUID>`, permitted by `<bundle ID>.continued-backup.*` |
 | Background upload session | `com.g8row.photosbackup.background-upload` |
 
 > [!IMPORTANT]

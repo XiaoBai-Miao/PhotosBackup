@@ -17,36 +17,62 @@ final class ContinuedBackupTests: XCTestCase {
         XCTAssertFalse(decide(system: true))
     }
 
-    func testTheIdentifierUsesThePlistEntryThatStartsWithTheRunningBundleID() {
+    func testARenamedBundleLeadsWithItsOwnIDWhenABroadWildcardPermitsIt() {
+        // SideStore signs com.g8row.photosbackup as com.g8row.photosbackup.TEAM
+        // and leaves the plist as built.
         let permitted = [
             "com.g8row.photosbackup.background-backup",
             "com.g8row.photosbackup.continued-backup.*",
-            "com.g8row.photosbackup.TEAM.continued-backup.*",
+            "com.g8row.photosbackup.*",
         ]
-        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: "com.g8row.photosbackup.TEAM",
-                                                              permitted: permitted),
-                       "com.g8row.photosbackup.TEAM.continued-backup.")
-        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: "com.g8row.photosbackup",
-                                                              permitted: permitted),
-                       "com.g8row.photosbackup.continued-backup.")
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: "com.g8row.photosbackup.TEAM",
+                                                                permitted: permitted),
+                       ["com.g8row.photosbackup.TEAM.continued-backup.", "com.g8row.photosbackup.continued-backup."])
     }
 
-    func testARenamedBundleStillTriesTheBuildTimeEntry() {
-        // A sideloading tool can rename the bundle without touching the plist.
-        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: "com.g8row.photosbackup.TEAM",
-                                                              permitted: ["com.g8row.photosbackup.continued-backup.*"]),
-                       "com.g8row.photosbackup.continued-backup.")
-        XCTAssertNil(ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: "com.g8row.photosbackup",
-                                                            permitted: ["com.g8row.photosbackup.background-backup"]))
+    func testAnUnrenamedBundleUsesItsOwnEntryOnce() {
+        let permitted = ["com.g8row.photosbackup.continued-backup.*", "com.g8row.photosbackup.*"]
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: "com.g8row.photosbackup",
+                                                                permitted: permitted),
+                       ["com.g8row.photosbackup.continued-backup."])
     }
 
-    func testTheShippedPlistPermitsAContinuedBackupIdentifier() throws {
+    func testWithoutABroadWildcardARenamedBundleFallsBackToTheBuildTimeEntry() {
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: "com.g8row.photosbackup.TEAM",
+                                                                permitted: ["com.g8row.photosbackup.continued-backup.*"]),
+                       ["com.g8row.photosbackup.continued-backup."])
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: "com.g8row.photosbackup",
+                                                                permitted: ["com.g8row.photosbackup.background-backup"]),
+                       [])
+    }
+
+    func testTheShippedPlistPermitsTheRunningBundleIDAndNotTheProcessingTask() throws {
         let bundle = Bundle(for: UploadQueue.self)
         let permitted = try XCTUnwrap(bundle.object(forInfoDictionaryKey: "BGTaskSchedulerPermittedIdentifiers") as? [String])
-        let prefix = try XCTUnwrap(ContinuedBackupPolicy.identifierPrefix(bundleIdentifier: bundle.bundleIdentifier,
-                                                                          permitted: permitted))
-        XCTAssertTrue(prefix.hasPrefix(try XCTUnwrap(bundle.bundleIdentifier) + "."),
-                      "iOS wants the bundle ID at the front of a continued-processing identifier")
+        let id = try XCTUnwrap(bundle.bundleIdentifier)
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: id, permitted: permitted).first,
+                       id + ".continued-backup.")
+        // As SideStore would rename it: the build-time entry is the one left.
+        XCTAssertEqual(ContinuedBackupPolicy.identifierPrefixes(bundleIdentifier: id + ".TEAMID", permitted: permitted),
+                       [id + ".continued-backup."])
+        // No entry may cover the processing task's identifier: with one, iOS
+        // refused to register that task's handler.
+        let processing = AutomaticBackupCoordinator.taskIdentifier
+        XCTAssertFalse(permitted.contains { $0.hasSuffix("*") && processing.hasPrefix(String($0.dropLast())) })
+    }
+
+    /// SideStore rewrites the declared identifiers to its renamed bundle; the
+    /// processing task registers under whatever this install declares.
+    func testTheProcessingTaskUsesTheIdentifierThisInstallDeclares() {
+        XCTAssertEqual(AutomaticBackupCoordinator.resolveTaskIdentifier(permitted: [
+            "com.g8row.photosbackup.TEAM.background-backup",
+            "com.g8row.photosbackup.TEAM.continued-backup.*",
+        ]), "com.g8row.photosbackup.TEAM.background-backup")
+        XCTAssertEqual(AutomaticBackupCoordinator.resolveTaskIdentifier(permitted: [
+            "com.g8row.photosbackup.background-backup", "com.g8row.photosbackup.continued-backup.*",
+        ]), "com.g8row.photosbackup.background-backup")
+        XCTAssertEqual(AutomaticBackupCoordinator.resolveTaskIdentifier(permitted: []),
+                       AutomaticBackupCoordinator.builtTaskIdentifier)
     }
 
     func testTheHeartbeatMovesProgressInsideTheItemInFlightOnly() {
