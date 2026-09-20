@@ -73,9 +73,13 @@ Photos credential, and an authenticated `photosdata-pa` request succeeds.
 The Xcode project, app target, and scheme are named `PhotosBackup`; the
 user-facing app is named **Photos Backup**.
 
-Latest release: **0.3.6** ([releases](https://github.com/g8row/PhotosBackup/releases)).
-161 tests run on an iPhone simulator: 158 pass. The 2 opt-in live tests and
-the Keychain round trip, which needs a signed build, are skipped.
+Latest release: **0.3.7** ([releases](https://github.com/g8row/PhotosBackup/releases)).
+Every push and pull request runs the suite on an iPhone simulator: 191 tests,
+189 pass, 0 fail. The 2 opt-in live tests are skipped.
+
+Each release's `.ipa` is built by GitHub Actions from the tagged commit and
+attached with its SHA-256, so the binary can be checked against the source it
+claims to come from.
 
 ### App identity (since 0.0.2)
 
