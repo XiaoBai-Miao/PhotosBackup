@@ -20,12 +20,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The whole point of building here is that a release binary can be tied
+      # to the commit AND the toolchain it claims. Falling back to whatever the
+      # runner image ships would quietly break that, so a missing pin fails the
+      # build instead: bump the version here deliberately when it is retired.
       - name: Select Xcode
         run: |
-          if [ -d /Applications/Xcode_16.4.app ]; then
-            echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::$XCODE_APP is not on this runner. Available:"
+            ls -d /Applications/Xcode*.app >&2 || true
+            exit 1
           fi
-          xcodebuild -version
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$XCODE_APP/Contents/Developer" xcodebuild -version
+        env:
+          XCODE_APP: /Applications/Xcode_16.4.app
 
       - name: Install xcodegen
         run: brew install xcodegen

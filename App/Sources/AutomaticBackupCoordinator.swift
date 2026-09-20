@@ -116,8 +116,7 @@ final class AutomaticBackupCoordinator: ObservableObject {
         self.network = network
         self.libraryChanges = libraryChanges ?? PhotoLibraryChangeTracker()
         queue.followUpSources = { [weak self] source in
-            guard let self else { return [] }
-            return self.motionFollowUps(after: source) + self.editBaseFollowUps(after: source)
+            self?.followUps(after: source) ?? []
         }
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) { setUpContinuedBackup() }
@@ -200,22 +199,29 @@ final class AutomaticBackupCoordinator: ObservableObject {
         Task { await queueLivePhotoMotion() }
     }
 
-    /// A Live Photo's motion is committed onto its still, so it is queued once
-    /// the still is in the account: right after the still's row finishes.
-    private func motionFollowUps(after source: MediaSource) -> [MediaSource] {
-        guard preferences.backUpLivePhotoMotion, case .asset(let identifier) = source,
-              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
-              asset.mediaSubtypes.contains(.photoLive) else { return [] }
-        return [.livePhotoMotion(localIdentifier: identifier)]
-    }
-
-    /// A photo edited in the Google Photos app also needs the version that edit
-    /// was applied on, which is what that app checks. Queued after the photo.
-    private func editBaseFollowUps(after source: MediaSource) -> [MediaSource] {
+    /// What else has to back up once this row's source is in the account: a
+    /// Live Photo's motion, which is committed onto the still, and the version
+    /// a Google Photos edit was applied on, which that app checks.
+    ///
+    /// Both answers come from one library fetch. This runs on the main actor
+    /// as every row finishes, so a full-library backup pays for it once per
+    /// item, and asking for the asset twice doubled that for no gain.
+    private func followUps(after source: MediaSource) -> [MediaSource] {
+        // A motion or edit-base row is itself a follow-up and has none of its
+        // own. Checked before the fetch, which is the expensive part.
         guard case .asset(let identifier) = source,
-              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject,
-              MediaExporter.hasEditBase(asset) else { return [] }
-        return [.editBase(localIdentifier: identifier)]
+              let asset = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil).firstObject
+        else { return [] }
+        var followUps: [MediaSource] = []
+        if preferences.backUpLivePhotoMotion, asset.mediaSubtypes.contains(.photoLive) {
+            followUps.append(.livePhotoMotion(localIdentifier: identifier))
+        }
+        // Reads the asset's resources, so it is left until last: it only runs
+        // for an asset that carries an adjustment.
+        if MediaExporter.hasEditBase(asset) {
+            followUps.append(.editBase(localIdentifier: identifier))
+        }
+        return followUps
     }
 
     /// Once per account, queue the edit base of every photo already remembered

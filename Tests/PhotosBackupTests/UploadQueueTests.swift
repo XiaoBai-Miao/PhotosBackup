@@ -133,7 +133,9 @@ final class UploadQueueTests: XCTestCase {
         let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
                                 sleeper: { await gate.sleep($0) })
         queue.enqueue(sources(2))
-        await settle(queue) { queue.rateLimitPauseReason != nil }
+        // The pause reason is set before the waiting task starts, so waiting on
+        // it alone raced the sleeper and saw no delay yet on a loaded machine.
+        await settle(queue) { queue.rateLimitPauseReason != nil && !gate.requested.isEmpty }
         XCTAssertEqual(queue.items.map(\.state), [.queued, .queued])
         XCTAssertEqual(queue.pauseReason, queue.rateLimitPauseReason)
         XCTAssertEqual(gate.requested, [UploadQueue.rateLimitBaseDelay])
@@ -233,9 +235,52 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertEqual(queue.items.count, 1, "the deleted photo's row is gone")
         XCTAssertEqual(queue.items.first?.state, .done)
         XCTAssertEqual(queue.failedCount, 0)
-        XCTAssertEqual(queue.settledRowCount, 1)
+        // The drop settles the row. A continued backup reports its total as
+        // settled plus unfinished, so leaving the dropped row out of both
+        // walked that total backwards mid-run.
+        XCTAssertEqual(queue.settledRowCount, 2)
         XCTAssertEqual(script.calls, 2)
         assertAggregatesMatchRows(queue)
+    }
+
+    /// A `CancellationError` no `cancel` or requeue claimed is an interruption,
+    /// not a decision — the app suspended mid-export, say. It used to land in a
+    /// terminal `.cancelled` row labelled only "Cancelled", which explained
+    /// nothing, stayed in the list for good, and showed up beside the same
+    /// photo once a later scan backed it up (issue #19).
+    func testAnUnclaimedCancellationRetriesThenSaysWhatHappened() async {
+        let script = WorkerScript([], fallback: .fail(CancellationError()))
+        let queue = makeQueue(script, maxConcurrent: 1, maxAttempts: 3)
+        queue.enqueue(oneSource)
+        await settle(queue) { queue.items.first?.state.isFinished == true }
+        XCTAssertEqual(queue.items.first?.state,
+                       .failed(reason: "Backing this item up kept being interrupted before it finished.",
+                               retryable: true))
+        XCTAssertEqual(script.calls, 3, "it is retried rather than given up on at once")
+        assertAggregatesMatchRows(queue)
+    }
+
+    /// The common case: the interruption passes and the row backs up by itself.
+    func testAnUnclaimedCancellationRecoversOnTheNextAttempt() async {
+        let script = WorkerScript([.fail(CancellationError())])
+        let queue = makeQueue(script, maxConcurrent: 1)
+        queue.enqueue(oneSource)
+        await settle(queue) { queue.items.first?.state.isFinished == true }
+        XCTAssertEqual(queue.items.first?.state, .done)
+        XCTAssertEqual(queue.failedCount, 0)
+        assertAggregatesMatchRows(queue)
+    }
+
+    /// `.cancelled` now means one thing only, so the label may say so.
+    func testOnlyTheUsersOwnCancellationReadsAsStopped() async {
+        let script = WorkerScript([], fallback: .block)
+        let queue = makeQueue(script, maxConcurrent: 1)
+        let ids = queue.enqueue(oneSource)
+        await settle(queue) { queue.items.first?.state == .uploading(fraction: 0.5) }
+        queue.cancel(ids[0])
+        await settle(queue) { queue.items.first?.state.isFinished == true }
+        XCTAssertEqual(queue.items.first?.state, .cancelled)
+        XCTAssertEqual(queue.items.first?.state.label, "Stopped by you")
     }
 
     func testCredentialRejectionHaltsTheQueueAndLeavesWorkRequeued() async {
