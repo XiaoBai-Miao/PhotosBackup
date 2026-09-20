@@ -62,7 +62,9 @@ struct UploadItem: Identifiable, Equatable, Sendable {
             case .finalizing: return "Finishing"
             case .alreadyBackedUp: return "Already backed up"
             case .done: return "Backed up"
-            case .cancelled: return "Cancelled"
+            // Only ever the user's own doing now, so it says so: "Cancelled"
+            // on its own read as a failure the app would not explain.
+            case .cancelled: return "Stopped by you"
             case .failed(let reason, _): return reason
             }
         }
@@ -179,9 +181,9 @@ final class UploadQueue: ObservableObject {
     /// in memory only, and read by Diagnostics.
     @Published private(set) var recentFailures: [UploadFailure] = []
     @Published private(set) var failureCount = 0
-    /// Rows that reached a finished state in this session. It only grows, so
-    /// progress measured from it stays monotonic when Clear Finished takes
-    /// rows away.
+    /// Rows that stopped needing work in this session, whether they reached a
+    /// finished state or left the queue resolved. It only grows, so progress
+    /// measured from it stays monotonic when Clear Finished takes rows away.
     private(set) var settledRowCount = 0
     private static let recentFailureLimit = 25
 
@@ -1035,7 +1037,27 @@ final class UploadQueue: ObservableObject {
             // in-flight work for requeue. A later pump restarts it unchanged.
             if requeueCancelled.remove(id) != nil { setState(.queued, at: index); persist(); return }
             if error is CancellationError {
-                setState(.cancelled, at: index); cleanCheckpoint(for: index); persist(); return
+                // Nothing the user did: `cancel` and the requeue paths above
+                // both claim their rows before this, so reaching here means the
+                // work was interrupted on its own — a staging read dropped as
+                // the app was suspended, say. Marking that `.cancelled` left a
+                // bare "Cancelled" row that explained nothing, sat in the list
+                // for good, and reappeared beside the same photo once a later
+                // scan backed it up (issue #19). Treat it as the interruption
+                // it is: retry it, and if it keeps happening say so in words.
+                let attempt = items[index].attempts
+                if attempt < maxAttempts {
+                    setState(.waitingToRetry(attempt: attempt), at: index)
+                    persist()
+                    scheduleRetry(id, after: min(30, pow(2, Double(attempt))))
+                } else {
+                    let interrupted = "Backing this item up kept being interrupted before it finished."
+                    setState(.failed(reason: interrupted, retryable: true), at: index)
+                    recordFailure(name: items[index].name, reason: interrupted, status: nil, stage: stage)
+                    cleanCheckpoint(for: index)
+                    persist()
+                }
+                return
             }
             if error as? MediaExporter.Failure == .iCloudDownloadRequired {
                 items[index].attempts = max(0, items[index].attempts - 1)
@@ -1053,6 +1075,10 @@ final class UploadQueue: ObservableObject {
                 // same photos. Nothing is left to back up and nothing needs the
                 // user: drop the row rather than fail it.
                 cleanCheckpoint(for: index)
+                // The row is settled, not merely gone: a continued backup
+                // measures its total as settled plus unfinished, and dropping
+                // one without counting it walked that total backwards.
+                settledRowCount += 1
                 items.remove(at: index)
                 rebuildDerivedState()
                 persist()
