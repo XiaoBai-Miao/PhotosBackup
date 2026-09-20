@@ -133,7 +133,9 @@ final class UploadQueueTests: XCTestCase {
         let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
                                 sleeper: { await gate.sleep($0) })
         queue.enqueue(sources(2))
-        await settle(queue) { queue.rateLimitPauseReason != nil }
+        // The pause reason is set before the waiting task starts, so waiting on
+        // it alone raced the sleeper and saw no delay yet on a loaded machine.
+        await settle(queue) { queue.rateLimitPauseReason != nil && !gate.requested.isEmpty }
         XCTAssertEqual(queue.items.map(\.state), [.queued, .queued])
         XCTAssertEqual(queue.pauseReason, queue.rateLimitPauseReason)
         XCTAssertEqual(gate.requested, [UploadQueue.rateLimitBaseDelay])
