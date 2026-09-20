@@ -105,7 +105,19 @@ private extension MediaSource {
         case .asset(let identifier): return "asset:\(identifier)"
         case .file(let url): return "file:\(url.standardizedFileURL.path)"
         case .picked: return nil
+        case .livePhotoMotion(let identifier): return UploadQueue.motionKeyPrefix + identifier
+        case .editBase(let identifier): return UploadQueue.editBaseKeyPrefix + identifier
         }
+    }
+
+    var isEditBase: Bool {
+        if case .editBase = self { return true }
+        return false
+    }
+
+    var isLivePhotoMotion: Bool {
+        if case .livePhotoMotion = self { return true }
+        return false
     }
 }
 
@@ -144,6 +156,15 @@ final class UploadQueue: ObservableObject {
     @Published private(set) var networkPauseReason: String?
     /// Set when iOS ends a background execution window before the queue drains.
     @Published private(set) var systemPauseReason: String?
+    /// Set while Google refuses requests for going over its per-minute limit
+    /// (HTTP 429). Every row shares that limit, so the whole queue waits it out:
+    /// a row retrying a second or two later only meets the same refusal, and
+    /// fails once its attempts run out. Clears itself when the wait ends.
+    @Published private(set) var rateLimitPauseReason: String?
+    private var rateLimitTask: Task<Void, Never>?
+    private var rateLimitDelay = UploadQueue.rateLimitBaseDelay
+    static let rateLimitBaseDelay: Double = 60
+    static let rateLimitMaxDelay: Double = 600
     /// A durable user pause. Current uploads finish; new uploads wait.
     /// Resets the scan cursor: a pause changes which rows count as startable,
     /// so rows the scan already skipped have to be reconsidered.
@@ -158,6 +179,10 @@ final class UploadQueue: ObservableObject {
     /// in memory only, and read by Diagnostics.
     @Published private(set) var recentFailures: [UploadFailure] = []
     @Published private(set) var failureCount = 0
+    /// Rows that reached a finished state in this session. It only grows, so
+    /// progress measured from it stays monotonic when Clear Finished takes
+    /// rows away.
+    private(set) var settledRowCount = 0
     private static let recentFailureLimit = 25
 
     /// Called once when Google refuses the credential, so the account state can follow.
@@ -257,6 +282,7 @@ final class UploadQueue: ObservableObject {
     /// and the scan cursor cannot drift away from `items`.
     private func setState(_ state: UploadItem.State, at index: Int) {
         let id = items[index].id
+        if state.isFinished, !items[index].state.isFinished { settledRowCount += 1 }
         tally(items[index].state, by: -1)
         tally(state, by: 1)
         items[index].state = state
@@ -335,6 +361,7 @@ final class UploadQueue: ObservableObject {
             ?? (isUserPaused ? "You paused backup. Tap Resume to continue." : nil)
             ?? networkPauseReason
             ?? systemPauseReason
+            ?? rateLimitPauseReason
     }
     var retainedStagingURLs: Set<URL> { Set(items.compactMap { $0.checkpoint?.fileURL }) }
     var retainedTransferIDs: Set<UUID> {
@@ -585,7 +612,29 @@ final class UploadQueue: ObservableObject {
     /// Settings verify action uses to explain what will be re-checked: it is a
     /// set, so re-verifying an item that is already in the cloud re-records the
     /// same key and the total does not move.
-    var completedSourceCount: Int { completedSourceKeys.count }
+    ///
+    /// Live Photo motions and Google Photos edit bases are recorded in the same
+    /// ledger under their own keys but are not counted: they add to a photo
+    /// already counted here.
+    var completedSourceCount: Int {
+        completedSourceKeys.count - completedSourceKeys.lazy.filter {
+            $0.hasPrefix(Self.motionKeyPrefix) || $0.hasPrefix(Self.editBaseKeyPrefix)
+        }.count
+    }
+
+    /// Ledger prefix of a Google Photos edit's base version, keyed by asset.
+    nonisolated static let editBaseKeyPrefix = "editbase:"
+
+    /// Ledger prefix of a Live Photo motion, keyed by its asset identifier.
+    nonisolated static let motionKeyPrefix = "motion:"
+
+    /// Live Photos whose motion is attached in Google Photos.
+    var completedMotionCount: Int { completedSourceKeys.lazy.filter { $0.hasPrefix(Self.motionKeyPrefix) }.count }
+
+    /// Asks, for each source that finishes, what else should back up after it.
+    /// Wired to queue a Live Photo's motion once its still is in the account,
+    /// since the motion is committed onto that still.
+    var followUpSources: (@MainActor (MediaSource) -> [MediaSource])?
 
     /// A snapshot test for "is this library asset already backed up", safe to
     /// hand to a background task computing per-album progress.
@@ -657,6 +706,7 @@ final class UploadQueue: ObservableObject {
         completionLedgerHealthy = true
         haltReason = nil
         systemPauseReason = nil
+        endRateLimitPause()
         isUserPaused = false
         persistenceWarning = nil
 
@@ -685,9 +735,9 @@ final class UploadQueue: ObservableObject {
             completedSourceKeys.formUnion(ledgerKeys)
             isUserPaused = snapshot.isUserPaused ?? false
             items = snapshot.items.compactMap { stored in
-                if let key = stored.source.mediaSource.queueDeduplicationKey,
+                if let key = stored.mediaSource.queueDeduplicationKey,
                    completedSourceKeys.contains(key) { return nil }
-                var item = UploadItem(id: stored.id, source: stored.source.mediaSource, name: stored.name)
+                var item = UploadItem(id: stored.id, source: stored.mediaSource, name: stored.name)
                 item.byteCount = stored.byteCount
                 item.attempts = stored.attempts
                 item.checkpoint = stored.checkpoint
@@ -877,7 +927,8 @@ final class UploadQueue: ObservableObject {
     // MARK: - Scheduling
 
     private func pump() {
-        guard haltReason == nil, networkPauseReason == nil, systemPauseReason == nil else { return }
+        guard haltReason == nil, networkPauseReason == nil, systemPauseReason == nil,
+              rateLimitPauseReason == nil else { return }
         while running.count < maxConcurrent, let index = nextStartableIndex() {
             start(at: index)
         }
@@ -957,9 +1008,13 @@ final class UploadQueue: ObservableObject {
             items[index].mediaKey = result.mediaKey
             setState(settled, at: index)
             if let key = items[index].source.queueDeduplicationKey { completedSourceKeys.insert(key) }
+            rateLimitDelay = Self.rateLimitBaseDelay
             items[index].checkpoint = nil
             recordCompletion(for: items[index])
             persist()
+            if let followUps = followUpSources?(items[index].source), !followUps.isEmpty {
+                enqueue(followUps, skippingExisting: true)
+            }
         case .failure(let error):
             // What the row was doing when it failed, before any of the
             // branches below overwrite it.
@@ -992,6 +1047,21 @@ final class UploadQueue: ObservableObject {
                 )
                 return
             }
+            if error as? MediaExporter.Failure == .missingAsset {
+                // Deleted from the photo library while it waited — which is what
+                // freeing space on the iPhone does to rows still queued for the
+                // same photos. Nothing is left to back up and nothing needs the
+                // user: drop the row rather than fail it.
+                cleanCheckpoint(for: index)
+                items.remove(at: index)
+                rebuildDerivedState()
+                persist()
+                DiagnosticEventLog.shared.record(
+                    "queue",
+                    "Dropped a queued item that was deleted from the photo library before it was backed up"
+                )
+                return
+            }
             let gpmc = error as? GPMCError
             let reason = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             // A refused credential and a full account both mean no other item
@@ -1003,6 +1073,15 @@ final class UploadQueue: ObservableObject {
                 setState(.queued, at: index)
                 persist()
                 halt(gpmc)
+                return
+            }
+            if case .server(429)? = gpmc?.kind {
+                // Google's limit, not this row's fault: give the attempt back
+                // and requeue the row behind the pause.
+                items[index].attempts = max(0, items[index].attempts - 1)
+                setState(.queued, at: index)
+                persist()
+                pauseForRateLimit(reason)
                 return
             }
             let retryable = gpmc?.isRetryable ?? false
@@ -1085,6 +1164,40 @@ final class UploadQueue: ObservableObject {
         }
     }
 
+    /// Stop starting rows until Google's per-minute limit has had time to reset.
+    /// The wait doubles while Google keeps refusing, up to ten minutes, and
+    /// drops back to a minute after the next success.
+    private func pauseForRateLimit(_ reason: String) {
+        // Rows already in flight when the limit hit come back here too; one
+        // pause covers them all.
+        guard rateLimitTask == nil else { return }
+        let delay = rateLimitDelay
+        rateLimitDelay = min(Self.rateLimitMaxDelay, rateLimitDelay * 2)
+        let minutes = Int(delay / 60)
+        rateLimitPauseReason = "Google asked the app to slow down. Backup continues in "
+            + (minutes <= 1 ? "a minute." : "\(minutes) minutes.")
+        DiagnosticEventLog.shared.record(
+            "queue",
+            "Google limited how many requests the app may make, so new work waits \(Int(delay)) s: \(reason)",
+            level: .warning
+        )
+        let sleeper = self.sleeper
+        rateLimitTask = Task { [weak self] in
+            await sleeper(delay)
+            guard let self, !Task.isCancelled else { return }
+            self.rateLimitTask = nil
+            self.rateLimitPauseReason = nil
+            self.pump()
+        }
+    }
+
+    private func endRateLimitPause() {
+        rateLimitTask?.cancel()
+        rateLimitTask = nil
+        rateLimitPauseReason = nil
+        rateLimitDelay = Self.rateLimitBaseDelay
+    }
+
     private func scheduleRetry(_ id: UUID, after seconds: Double) {
         let sleeper = self.sleeper
         Task { [weak self] in
@@ -1124,6 +1237,8 @@ final class UploadQueue: ObservableObject {
             guard let source = PersistedMediaSource(item.source)
                     ?? item.checkpoint.map({ .file($0.filePath) }) else { return nil }
             let interruptions = item.interruptedPreparations > 0 ? item.interruptedPreparations : nil
+            let motion: Bool? = item.source.isLivePhotoMotion ? true : nil
+            let editBase: Bool? = item.source.isEditBase ? true : nil
             switch item.state {
             case .alreadyBackedUp, .done:
                 return nil
@@ -1133,20 +1248,20 @@ final class UploadQueue: ObservableObject {
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
-                                           checkpoint: nil, cancelled: true)
+                                           checkpoint: nil, cancelled: true, motion: motion, editBase: editBase)
             case .failed(let reason, let retryable):
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: reason, failureRetryable: retryable,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions)
+                                           interruptedPreparations: interruptions, motion: motion, editBase: editBase)
             default:
                 // Working and retry-delay states intentionally restore queued.
                 return PersistedUploadItem(id: item.id, source: source, name: item.name,
                                            byteCount: item.byteCount, attempts: item.attempts,
                                            failureReason: nil, failureRetryable: false,
                                            checkpoint: item.checkpoint,
-                                           interruptedPreparations: interruptions)
+                                           interruptedPreparations: interruptions, motion: motion, editBase: editBase)
             }
         }
         let snapshot = UploadQueueSnapshot(

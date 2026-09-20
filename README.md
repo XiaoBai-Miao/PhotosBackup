@@ -30,10 +30,24 @@ without a desktop companion or hosted service.
 - Restore pending album uploads after an app restart and remember completed
   library assets per Google account.
 - Show per-album backup progress, and re-upload assets edited after backup.
+- Back up an edited photo as it looks on the iPhone, the file the Google Photos
+  app would upload itself, so Google Photos' Free up space recognises it.
+- With Back Up Live Photo Motion on, back up a Live Photo with its motion
+  attached, so it plays as a Live Photo and the Google Photos app's Free up
+  space offers it. Live Photos backed up as a still earlier get their motion
+  added in the background.
+- Back up a photo edited in the Google Photos app so that app counts it as
+  backed up. Google Photos applies its own edit on top of the camera's
+  Portrait blur or crop, and only counts the photo once the account holds that
+  in-between version, so it is uploaded in addition to the finished edit.
 - Upload in original quality or request Google's Storage Saver processing.
 - Choose how many uploads run at once, from 1 to 10.
 - Enforce Wi-Fi-only or Wi-Fi-and-cellular policy at queue and request level,
   cancelling in-flight background transfers when the allowed transport is lost.
+- Keep backing up after you leave the app, on iOS 26 and later. While the app
+  is open with work queued, it asks iOS to continue that work in the
+  background; iOS shows the progress in a Live Activity, where it can be
+  cancelled. In the background at most 2 uploads run at once.
 - Request recurring iOS background-processing windows for selected-album backup.
 - Expose a **Back Up Photos** Shortcuts action on iOS 16+ for charger,
   time-of-day, Wi-Fi, and other personal automations. It runs even with
@@ -69,6 +83,7 @@ the Keychain round trip, which needs a signed build, are skipped.
 | --- | --- |
 | App bundle ID | `com.g8row.photosbackup` |
 | Background task | `com.g8row.photosbackup.background-backup` |
+| Continued backup (iOS 26+) | `<bundle ID>.continued-backup.<UUID>`, permitted by `<bundle ID>.continued-backup.*` |
 | Background upload session | `com.g8row.photosbackup.background-upload` |
 
 > [!IMPORTANT]
@@ -231,10 +246,25 @@ Android master token → Photos access token → private Photos API
 ## Known limitations
 
 - Google can change or disable the private authentication and Photos endpoints.
-- Live Photos currently upload only their still image; the motion component is
-  ignored.
+- The Google Photos app's Free up space skips edited photos (including Live
+  Photos the camera saves with an adjustment, such as Portrait) when a
+  Google-side setting is on for the account, even when Google's own backup
+  uploaded them. Photos Backup backs them up in full, but cannot make Google
+  offer them for removal. The Google Photos app's multi-select Delete from
+  device does remove them, since it only needs the photo to be backed up.
+- A photo or video saved to the iPhone from Google Photos (a file with a name
+  like `AIXW8346.JPG`) never counts as backed up in the Google Photos app, even
+  though the library already holds it: an upload of the same bytes merges into
+  that existing item. Any edit in Apple Photos makes a new file, which then
+  counts once backed up.
+- An edited photo or video is backed up as it looks on the iPhone. Its
+  unedited original is kept only if an earlier backup uploaded it.
 - Background album backup is opportunistic: iOS decides when each processing
   request runs and may delay it based on usage, battery, and system policy.
+- Continuing after you leave the app needs iOS 26, and iOS accepts the request
+  only while the app is open. iOS can still end it early to reclaim resources,
+  and ends it when the app is swiped away in the app switcher; unfinished work
+  waits for the next time the app runs.
 - Shortcuts can create extra backup opportunities on iOS 16+, but iOS gives
   each run about 30 seconds. The action queues durable work and gives prepared
   file transfers to the background URL session; it is not a periodic guarantee.
@@ -299,6 +329,7 @@ Never commit tokens or captured account credentials.
 ```text
 App/Sources/                  SwiftUI app, onboarding, account, and upload queue
 App/Sources/AutomaticBackupCoordinator.swift  BGProcessingTask scheduling
+App/Sources/ContinuedBackup.swift             iOS 26 continued backup after leaving the app
 App/Sources/BackgroundUploadTransport.swift   Relaunch-safe file PUT transport
 App/Sources/PhotoLibraryChangeTracker.swift   Persistent PhotoKit scan token
 App/Sources/NetworkPolicy.swift               Wi-Fi-only / cellular enforcement

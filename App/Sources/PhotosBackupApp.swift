@@ -95,6 +95,10 @@ struct PhotosBackupApp: App {
                     DiagnosticEventLog.shared.record("settings", "Count Against Storage Quota turned \(value ? "on" : "off")")
                     queue.options.useQuota = value
                 }
+                .onChange(of: preferences.backUpLivePhotoMotion) { value in
+                    DiagnosticEventLog.shared.record("settings", "Back Up Live Photo Motion turned \(value ? "on" : "off")")
+                    automaticBackup.livePhotoMotionPreferenceDidChange()
+                }
                 .onChange(of: preferences.concurrentUploads) { value in
                     DiagnosticEventLog.shared.record("settings", "Simultaneous uploads set to \(value)")
                     queue.setMaxConcurrent(value)

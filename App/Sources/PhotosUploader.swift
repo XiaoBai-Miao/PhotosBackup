@@ -122,7 +122,20 @@ struct PhotosUploader {
             }
             if checkpoint == nil {
                 await emit(.state(.exporting))
-                let media = try await exporter.export(source, allowsNetworkAccess: options.allowsICloudDownload)
+                let media: ExportedMedia
+                do {
+                    media = try await exporter.export(source, allowsNetworkAccess: options.allowsICloudDownload)
+                } catch MediaExporter.Failure.noMotion {
+                    // A Live Photo whose motion is gone has nothing to attach. Settle
+                    // the row rather than leave a failure nobody can act on.
+                    DiagnosticEventLog.shared.record("upload", "A Live Photo had no motion left to back up, so its motion row finished without uploading")
+                    return .alreadyBackedUp(mediaKey: "")
+                } catch MediaExporter.Failure.noEditBase {
+                    // Stacked on an edit that is not the Google Photos app's, or
+                    // since reverted: nothing to add. Settle the row.
+                    DiagnosticEventLog.shared.record("upload", "A photo had no Google Photos edit to back up the base of, so its row finished without uploading")
+                    return .alreadyBackedUp(mediaKey: "")
+                }
                 if media.byteCount >= largeItemThreshold {
                     DiagnosticEventLog.shared.record(
                         "upload",
@@ -136,9 +149,18 @@ struct PhotosUploader {
                     byteCount: media.byteCount,
                     temporary: media.temporary,
                     prepared: nil,
-                    continuesAfterProcessExit: await client.usesBackgroundFileTransfers
+                    continuesAfterProcessExit: await client.usesBackgroundFileTransfers,
+                    pairedStillHash: media.pairedStillHash
                 )
-                await emit(.described(name: media.filename, byteCount: media.byteCount))
+                let name: String
+                if media.pairedStillHash != nil {
+                    name = "\(media.filename) (Live Photo motion)"
+                } else if case .editBase = source {
+                    name = "\(media.filename) (before Google Photos edit)"
+                } else {
+                    name = media.filename
+                }
+                await emit(.described(name: name, byteCount: media.byteCount))
                 await emit(.checkpoint(checkpoint))
             }
             guard var checkpoint else {
@@ -147,12 +169,16 @@ struct PhotosUploader {
             try Task.checkCancellation()
 
             if checkpoint.prepared == nil {
-                let preparation = try await client.prepareUpload(
-                    file: checkpoint.fileURL,
-                    filename: checkpoint.filename,
-                    modified: checkpoint.modified
-                ) { phase in
-                    relay.report(phase.itemState)
+                let report: @Sendable (UploadPhase) -> Void = { phase in relay.report(phase.itemState) }
+                let preparation: UploadPreparation
+                if let stillHash = checkpoint.pairedStillHash {
+                    preparation = try await client.prepareMotionUpload(
+                        file: checkpoint.fileURL, filename: checkpoint.filename,
+                        modified: checkpoint.modified, stillHash: stillHash, phase: report)
+                } else {
+                    preparation = try await client.prepareUpload(
+                        file: checkpoint.fileURL, filename: checkpoint.filename,
+                        modified: checkpoint.modified, phase: report)
                 }
                 await relay.flush()
                 switch preparation {
@@ -208,7 +234,8 @@ struct PhotosUploader {
                 // current one.
                 outcome = try await client.commit(completed,
                                                   useQuota: options.useQuota,
-                                                  saver: options.storageSaver) { phase in
+                                                  saver: options.storageSaver,
+                                                  pairedStillHash: checkpoint.pairedStillHash) { phase in
                     relay.report(phase.itemState)
                 }
             } catch let error as GPMCError where error.kind == .invalidUploadReceipt {

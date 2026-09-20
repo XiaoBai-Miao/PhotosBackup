@@ -7,6 +7,7 @@ enum AutomaticBackupRunSource: String, Codable, Sendable {
     case backgroundProcessing = "iOS background processing"
     case shortcut = "Shortcuts automation"
     case backgroundTransfer = "Background transfer completion"
+    case continued = "Continued in background"
     case debugSimulation = "Debug simulation"
 
     /// Runs the user started by opening the app or tapping a button. They are

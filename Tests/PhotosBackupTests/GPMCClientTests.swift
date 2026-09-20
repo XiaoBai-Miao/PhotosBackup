@@ -653,6 +653,119 @@ final class GPMCClientTests: XCTestCase {
         return nil
     }
 
+    // MARK: - Live Photo motion
+
+    /// A scripted Google for a motion upload. `motionKey` answers the lookup
+    /// made as a Live Photo motion (sha1MediaType 2), `stillKey` the plain one.
+    private static func motionHandler(motionKey: String?, stillKey: String?) -> (URLRequest) -> StubProtocol.Reply {
+        { request in
+            let path = request.stubPath
+            if path == "/auth" { return .text("Auth=ya29.token\nExpiry=\(farFuture)\n") }
+            if path.hasSuffix("/5084965799730810217") {
+                let key = isMotionLookup(request) ? motionKey : stillKey
+                guard let key else { return .ok(Data()) }
+                return .ok(Proto.bytes(1, Proto.bytes(2, Proto.bytes(2, Proto.string(1, key)))))
+            }
+            if path.hasSuffix("/16538846908252377752") {
+                return .ok(Proto.bytes(1, Proto.bytes(3, Proto.string(1, stillKey ?? "NEWKEY"))))
+            }
+            if request.httpMethod == "PUT" { return .ok(Proto.int(1, 1) + Proto.bytes(2, Data("receipt".utf8))) }
+            return .ok(Data(), headers: ["X-GUploader-UploadID": "upload-123"])
+        }
+    }
+
+    /// `request.queryArray[0].sha1MediaType == PhodeoMovie (2)`.
+    private static func isMotionLookup(_ request: URLRequest) -> Bool {
+        guard let lookup = try? Proto.fields(body(of: request))[1]?.first,
+              let query = try? Proto.fields(lookup)[1]?.first else { return false }
+        return (try? Proto.number(5, in: query)) == 2
+    }
+
+    /// The Google Photos app's own check for attached motion: the video's hash,
+    /// looked up as a Live Photo motion, resolves to the Live Photo. Nothing is
+    /// uploaded when it does.
+    func testMotionAlreadyAttachedSettlesWithoutUploading() async throws {
+        StubProtocol.handler = Self.motionHandler(motionKey: "LIVEKEY", stillKey: "STILLKEY")
+        let file = try scratchFile(name: "IMG_0001.MOV")
+        let client = try GPMCClient(authData: Self.credential, session: StubProtocol.session())
+        let preparation = try await client.prepareMotionUpload(file: file, filename: "IMG_0001.MOV",
+                                                               stillHash: Data(repeating: 1, count: 20)) { _ in }
+        XCTAssertEqual(preparation, .alreadyBackedUp(mediaKey: "LIVEKEY"))
+        let lookups = StubProtocol.seen.filter { $0.stubPath.hasSuffix("/5084965799730810217") }
+        XCTAssertEqual(lookups.count, 1)
+        XCTAssertTrue(Self.isMotionLookup(try XCTUnwrap(lookups.first)))
+        XCTAssertFalse(StubProtocol.seen.contains { $0.stubPath.hasSuffix("/interactive") })
+    }
+
+    /// The motion is committed onto its still, so without the still in the
+    /// account there is nothing to attach it to yet: wait and retry, don't upload.
+    func testMotionWaitsWhileItsPhotoIsNotInTheAccount() async throws {
+        StubProtocol.handler = Self.motionHandler(motionKey: nil, stillKey: nil)
+        let file = try scratchFile(name: "IMG_0001.MOV")
+        let client = try GPMCClient(authData: Self.credential, session: StubProtocol.session())
+        do {
+            _ = try await client.prepareMotionUpload(file: file, filename: "IMG_0001.MOV",
+                                                     stillHash: Data(repeating: 1, count: 20)) { _ in }
+            XCTFail("expected the motion to wait for its photo")
+        } catch let error as GPMCError {
+            XCTAssertEqual(error.kind, .pairedPhotoMissing)
+            XCTAssertTrue(error.isRetryable)
+        }
+        XCTAssertFalse(StubProtocol.seen.contains { $0.stubPath.hasSuffix("/interactive") })
+    }
+
+    func testMotionUploadsWhenItsPhotoIsInTheAccountWithoutIt() async throws {
+        StubProtocol.handler = Self.motionHandler(motionKey: nil, stillKey: "STILLKEY")
+        let file = try scratchFile(name: "IMG_0001.MOV")
+        let client = try GPMCClient(authData: Self.credential, session: StubProtocol.session())
+        let preparation = try await client.prepareMotionUpload(file: file, filename: "IMG_0001.MOV",
+                                                               stillHash: Data(repeating: 1, count: 20)) { _ in }
+        guard case .ready(let prepared) = preparation else { return XCTFail("expected an upload, got \(preparation)") }
+        XCTAssertEqual(prepared.hash, Data(Insecure.SHA1.hash(data: try Data(contentsOf: file))))
+        XCTAssertEqual(prepared.filename, "IMG_0001.MOV")
+    }
+
+    /// The seam between the two halves: a restored motion checkpoint goes
+    /// through the motion preflight, and its still's hash reaches the commit.
+    func testAMotionCheckpointIsPreparedAsMotionAndCommittedOntoItsStill() async throws {
+        StubProtocol.handler = Self.motionHandler(motionKey: nil, stillKey: "STILLKEY")
+        let file = try scratchFile(name: "IMG_0001.MOV")
+        let stillHash = Data(repeating: 5, count: 20)
+        let client = try GPMCClient(authData: Self.credential, session: StubProtocol.session())
+        let worker = PhotosUploader(exporter: MediaExporter()) { client }.worker()
+        let checkpoint = UploadCheckpoint(filePath: file.path, filename: "IMG_0001.MOV",
+                                          modified: Date(timeIntervalSince1970: 1_600_000_000), byteCount: 4096,
+                                          temporary: false, prepared: nil, continuesAfterProcessExit: false,
+                                          pairedStillHash: stillHash)
+        let outcome = try await worker(UUID(), .livePhotoMotion(localIdentifier: "live-1"), checkpoint,
+                                       UploadOptions()) { _ in }
+        XCTAssertEqual(outcome, .uploaded(mediaKey: "STILLKEY"))
+        XCTAssertTrue(StubProtocol.seen.contains { $0.stubPath.hasSuffix("/5084965799730810217") && Self.isMotionLookup($0) })
+        let commit = try XCTUnwrap(StubProtocol.seen.first { $0.stubPath.hasSuffix("/16538846908252377752") })
+        let metadata = try XCTUnwrap(try Proto.fields(Self.body(of: commit))[1]?.first)
+        XCTAssertEqual(try Proto.fields(metadata)[9]?.first, Proto.int(2, 1) + Proto.bytes(3, stillHash))
+    }
+
+    /// Blueprint field 9 `reconcileInfo {2: Phodeo, 3: still SHA-1}` is what
+    /// attaches the upload to the still as its motion (verified on device,
+    /// 2026-09-19: the item plays as a Live Photo and stays free).
+    func testMotionCommitNamesTheStillItAttachesTo() async throws {
+        let stillHash = Data(repeating: 9, count: 20)
+        StubProtocol.handler = Self.photosHandler()
+        let client = try GPMCClient(authData: Self.credential, session: StubProtocol.session())
+        _ = try await client.commit(Self.preparedFixture(), useQuota: false, saver: false,
+                                    pairedStillHash: stillHash) { _ in }
+        let sent = try XCTUnwrap(StubProtocol.seen.first { $0.stubPath.hasSuffix("/16538846908252377752") })
+        let metadata = try XCTUnwrap(try Proto.fields(Self.body(of: sent))[1]?.first)
+        XCTAssertEqual(try Proto.fields(metadata)[9]?.first, Proto.int(2, 1) + Proto.bytes(3, stillHash))
+        XCTAssertEqual(Self.varint(7, in: metadata), 3)
+    }
+
+    func testAPlainCommitAttachesNothing() async throws {
+        let (metadata, _) = try await commitBody(Self.preparedFixture(), useQuota: false, saver: false)
+        XCTAssertNil(try Proto.fields(metadata)[9])
+    }
+
     private static func preparedFixture() -> PreparedUpload {
         PreparedUpload(uploadURL: URL(string: "https://example.com/upload")!,
                        hash: Data(repeating: 7, count: 20), filename: "IMG_0009.JPG",

@@ -33,10 +33,10 @@ Generated `PhotosBackup.xcodeproj` is disposable — regenerate, don't hand-edit
 | `GPMCClient` | GPMC/Core/GPMCClient.swift | `photosdata-pa` RPCs, protobuf, access-token refresh (1 forced re-auth on 401/403), `GPMCError` with `isRetryable` |
 | `UploadQueue` (`@MainActor`) | UploadQueue.swift | Bounded concurrency (default 2), 3 attempts w/ backoff, halt-on-credential-rejected, states: queued → exporting → hashing → checkingDuplicate → uploading → finalizing → done/alreadyBackedUp |
 | `UploadQueuePersistence` | UploadQueuePersistence.swift | Durable per-account snapshot (version-checked, never reused across accounts) |
-| `AutomaticBackupCoordinator` | AutomaticBackupCoordinator.swift | BGProcessingTask scheduling; batches: 25/background window, 250/foreground |
+| `AutomaticBackupCoordinator` | AutomaticBackupCoordinator.swift | BGProcessingTask scheduling; batches: 25/background window, 250/foreground. On iOS 26 also holds a `BGContinuedProcessingTask` (`ContinuedBackup.swift`) whenever the open app has work, so the queue keeps running after the app is backgrounded (max 2 concurrent there); the other background paths skip their suspend while it is active |
 | `NetworkPolicy` / monitor | NetworkPolicy.swift | Wi-Fi-only vs Wi-Fi+cellular, enforced at queue + request level |
 | `CredentialStore` | CredentialStore.swift | Single Keychain item, `AfterFirstUnlockThisDeviceOnly` |
-| `MediaExport` / `PhotosUploader` | MediaExport.swift / PhotosUploader.swift | PHAsset export → hash → duplicate-check → upload → finalize; Live Photos = still only |
+| `MediaExport` / `PhotosUploader` | MediaExport.swift / PhotosUploader.swift | PHAsset export → hash → duplicate-check → upload → finalize; Live Photos = still, then motion attached as a separate `livePhotoMotion` row; a photo edited in the Google Photos app (`com.google.photos.editing.filtering.nondestructive`) also gets an `editBase` row uploading `.adjustmentBasePhoto`, the version that app checks |
 
 ## Data flow
 

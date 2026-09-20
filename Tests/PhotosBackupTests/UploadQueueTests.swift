@@ -44,6 +44,22 @@ private extension NSLock {
     func sync<T>(_ body: () -> T) -> T { lock(); defer { unlock() }; return body() }
 }
 
+/// A queue sleeper that records each requested delay and holds every sleeper
+/// until the test opens it.
+final class SleepGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var delays: [Double] = []
+    var requested: [Double] { lock.sync { delays } }
+
+    func open() { lock.sync { isOpen = true } }
+
+    func sleep(_ seconds: Double) async {
+        lock.sync { delays.append(seconds) }
+        while !lock.sync({ isOpen }) { try? await Task.sleep(nanoseconds: 2_000_000) }
+    }
+}
+
 @MainActor
 final class UploadQueueTests: XCTestCase {
 
@@ -109,6 +125,55 @@ final class UploadQueueTests: XCTestCase {
         XCTAssertTrue(queue.isIdle)
     }
 
+    func testARateLimitedRowPausesTheQueueInsteadOfFailing() async {
+        let limited = GPMCError(kind: .server(429), message: "Google returned HTTP 429 during duplicate check.")
+        let script = WorkerScript([.fail(limited)])
+        let gate = SleepGate()
+        // One attempt: without the pause, the first refusal would fail the row.
+        let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
+                                sleeper: { await gate.sleep($0) })
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.rateLimitPauseReason != nil }
+        XCTAssertEqual(queue.items.map(\.state), [.queued, .queued])
+        XCTAssertEqual(queue.pauseReason, queue.rateLimitPauseReason)
+        XCTAssertEqual(gate.requested, [UploadQueue.rateLimitBaseDelay])
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(script.calls, 1, "nothing starts while Google's limit is in force")
+
+        gate.open()
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.items.map(\.state), [.done, .done])
+        XCTAssertNil(queue.rateLimitPauseReason)
+        XCTAssertEqual(queue.failedCount, 0)
+        assertAggregatesMatchRows(queue)
+    }
+
+    func testTheRateLimitPauseGrowsWhileGoogleKeepsRefusingAndResetsAfterASuccess() async {
+        let limited = GPMCError(kind: .server(429), message: "Google returned HTTP 429 during duplicate check.")
+        let script = WorkerScript([.fail(limited), .fail(limited), .succeed(.uploaded(mediaKey: "A")), .fail(limited)])
+        let gate = SleepGate()
+        gate.open()
+        let queue = UploadQueue(worker: script.worker(), maxConcurrent: 1, maxAttempts: 1,
+                                sleeper: { await gate.sleep($0) })
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.isIdle }
+        let base = UploadQueue.rateLimitBaseDelay
+        XCTAssertEqual(gate.requested, [base, base * 2, base])
+        XCTAssertEqual(queue.items.map(\.state), [.done, .done])
+    }
+
+    func testSettledRowsKeepCountingWhenFinishedRowsAreCleared() async {
+        let script = WorkerScript([.succeed(.uploaded(mediaKey: "A")),
+                                   .fail(GPMCError(kind: .server(400), message: "rejected")),
+                                   .succeed(.alreadyBackedUp(mediaKey: "B"))])
+        let queue = makeQueue(script, maxConcurrent: 1, maxAttempts: 1)
+        queue.enqueue(sources(3))
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.settledRowCount, 3, "done, failed and already backed up all settle a row")
+        queue.clearFinished()
+        XCTAssertEqual(queue.settledRowCount, 3)
+    }
+
     func testAlreadyBackedUpIsItsOwnTerminalState() async {
         let script = WorkerScript([.succeed(.alreadyBackedUp(mediaKey: "OLD"))])
         let queue = makeQueue(script)
@@ -148,13 +213,29 @@ final class UploadQueueTests: XCTestCase {
     }
 
     func testExporterFailureIsReportedVerbatimAndNotRetried() async {
-        let script = WorkerScript([.fail(MediaExporter.Failure.missingAsset)])
+        let script = WorkerScript([.fail(MediaExporter.Failure.noResource)])
         let queue = makeQueue(script, maxConcurrent: 1)
         queue.enqueue(oneSource)
         await settle(queue) { queue.items.first?.state.isFinished == true }
         XCTAssertEqual(queue.items.first?.state,
-                       .failed(reason: "That item is no longer in your photo library.", retryable: false))
+                       .failed(reason: "That item has no file to upload.", retryable: false))
         XCTAssertEqual(script.calls, 1)
+    }
+
+    /// Freeing space deletes photos that may still be queued. Seen on device:
+    /// about 2,000 rows failed "no longer in your photo library" after a
+    /// library was cleared mid-run. Such a row is dropped, not failed.
+    func testARowWhosePhotoWasDeletedIsDroppedNotFailed() async {
+        let script = WorkerScript([.fail(MediaExporter.Failure.missingAsset)])
+        let queue = makeQueue(script, maxConcurrent: 1)
+        queue.enqueue(sources(2))
+        await settle(queue) { queue.isIdle }
+        XCTAssertEqual(queue.items.count, 1, "the deleted photo's row is gone")
+        XCTAssertEqual(queue.items.first?.state, .done)
+        XCTAssertEqual(queue.failedCount, 0)
+        XCTAssertEqual(queue.settledRowCount, 1)
+        XCTAssertEqual(script.calls, 2)
+        assertAggregatesMatchRows(queue)
     }
 
     func testCredentialRejectionHaltsTheQueueAndLeavesWorkRequeued() async {
@@ -494,6 +575,88 @@ final class UploadQueueTests: XCTestCase {
         restored.setNetworkAccess(allowed: true)
         await settle(restored) { restored.items.first?.state == .done }
         XCTAssertEqual(secondScript.calls, 1)
+    }
+
+    /// A Live Photo's motion is committed onto its still, so the queue asks for
+    /// it only once the still has finished. The motion is recorded but not
+    /// counted: it adds to a photo already counted as backed up.
+    func testAFinishedLivePhotoQueuesItsMotionWithoutCountingIt() async {
+        let queue = makeQueue(WorkerScript([]), maxConcurrent: 1)
+        queue.followUpSources = { source in
+            guard case .asset(let identifier) = source, identifier == "live-1" else { return [] }
+            return [.livePhotoMotion(localIdentifier: identifier)]
+        }
+        queue.enqueue([.asset(localIdentifier: "live-1"), .asset(localIdentifier: "plain-1")])
+        await settle(queue) { queue.items.count == 3 && queue.items.allSatisfy { $0.state == .done } }
+        XCTAssertEqual(queue.items.map(\.source), [.asset(localIdentifier: "live-1"),
+                                                   .asset(localIdentifier: "plain-1"),
+                                                   .livePhotoMotion(localIdentifier: "live-1")])
+        XCTAssertEqual(queue.completedSourceCount, 2)
+        XCTAssertEqual(queue.completedMotionCount, 1)
+    }
+
+    /// A motion row is stored as its asset plus a flag, so builds without motion
+    /// rows still read the snapshot; this build restores it as a motion row.
+    func testAMotionRowRestoresAsAMotionRow() async {
+        let persistence = MemoryUploadQueuePersistence()
+        let first = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        first.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        first.activateAccount("person@gmail.com")
+        first.enqueue([.livePhotoMotion(localIdentifier: "live-1")], skippingExisting: true)
+
+        XCTAssertEqual(persistence.snapshot?.items.first?.source, .asset("live-1"))
+        XCTAssertEqual(persistence.snapshot?.items.first?.motion, true)
+
+        let restored = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        restored.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        restored.activateAccount("person@gmail.com")
+        XCTAssertEqual(restored.items.first?.source, .livePhotoMotion(localIdentifier: "live-1"))
+    }
+
+    /// A photo edited in the Google Photos app also backs up the version that
+    /// edit was applied on. Like a motion, it adds to a photo already counted.
+    func testAGoogleEditedPhotoQueuesItsEditBaseWithoutCountingIt() async {
+        let queue = makeQueue(WorkerScript([]), maxConcurrent: 1)
+        queue.followUpSources = { source in
+            guard case .asset(let identifier) = source, identifier == "edited-1" else { return [] }
+            return [.editBase(localIdentifier: identifier)]
+        }
+        queue.enqueue([.asset(localIdentifier: "edited-1"), .asset(localIdentifier: "plain-1")])
+        await settle(queue) { queue.items.count == 3 && queue.items.allSatisfy { $0.state == .done } }
+        XCTAssertEqual(queue.items.last?.source, .editBase(localIdentifier: "edited-1"))
+        XCTAssertEqual(queue.completedSourceCount, 2)
+        XCTAssertTrue(queue.completedSourceKeys.contains(UploadQueue.editBaseKeyPrefix + "edited-1"))
+    }
+
+    /// An edit-base row restores as one, never as a motion row: committing a
+    /// photo as a Live Photo's motion would write a bad item to the account.
+    func testAnEditBaseRowRestoresAsAnEditBaseRow() async {
+        let persistence = MemoryUploadQueuePersistence()
+        let first = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        first.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        first.activateAccount("person@gmail.com")
+        first.enqueue([.editBase(localIdentifier: "edited-1"), .livePhotoMotion(localIdentifier: "live-1")],
+                      skippingExisting: true)
+
+        let stored = persistence.snapshot?.items ?? []
+        XCTAssertEqual(stored.map(\.source), [.asset("edited-1"), .asset("live-1")])
+        XCTAssertEqual(stored.map(\.editBase), [true, nil])
+        XCTAssertEqual(stored.map(\.motion), [nil, true])
+
+        let restored = UploadQueue(worker: WorkerScript([]).worker(), maxConcurrent: 1, persistence: persistence)
+        restored.setNetworkAccess(allowed: false, pauseReason: "Waiting")
+        restored.activateAccount("person@gmail.com")
+        XCTAssertEqual(restored.items.map(\.source), [.editBase(localIdentifier: "edited-1"),
+                                                      .livePhotoMotion(localIdentifier: "live-1")])
+    }
+
+    func testAMotionCheckpointKeepsItsStillHash() throws {
+        let checkpoint = UploadCheckpoint(filePath: "/tmp/staged/IMG.MOV", filename: "IMG.MOV",
+                                          modified: Date(timeIntervalSince1970: 100), byteCount: 123,
+                                          temporary: true, prepared: nil,
+                                          pairedStillHash: Data(repeating: 4, count: 20))
+        let decoded = try JSONDecoder().decode(UploadCheckpoint.self, from: JSONEncoder().encode(checkpoint))
+        XCTAssertEqual(decoded.pairedStillHash, Data(repeating: 4, count: 20))
     }
 
     func testUploadCheckpointRestoresAtTheTransferBoundary() async {
