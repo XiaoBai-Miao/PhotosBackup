@@ -91,7 +91,7 @@ INTERPOLATED_KEYS = {
 NON_LOCALIZABLE = {
     "",
     "accounts.google.com",
-    "Your account is connected, and we’ll keep \(count) selected \(count == 1 ? ",
+    "Your account is connected, and we’ll keep \\(count) selected \\(count == 1 ? ",
 }
 
 ok = True

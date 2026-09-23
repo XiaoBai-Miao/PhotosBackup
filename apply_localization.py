@@ -55,7 +55,7 @@ add(P,
         let count = preferences.selectedAlbumIDs.count
         return count == 0
             ? "Your account is connected. You can choose albums from the Albums tab."
-            : "Your account is connected, and we’ll keep \(count) selected \(count == 1 ? "album" : "albums") protected."
+            : "Your account is connected, and we’ll keep \\(count) selected \\(count == 1 ? "album" : "albums") protected."
     }''',
     '''    private var permissionButtonTitle: String {
         switch albums.authorization {
@@ -69,7 +69,7 @@ add(P,
         let count = preferences.selectedAlbumIDs.count
         return count == 0
             ? String(localized: "Your account is connected. You can choose albums from the Albums tab.")
-            : String(localized: "Your account is connected, and we’ll keep \(count) selected \(count == 1 ? "album" : "albums") protected.")
+            : String(localized: "Your account is connected, and we’ll keep \\(count) selected \\(count == 1 ? "album" : "albums") protected.")
     }''')
 add(P,
     '''    private var connectionEyebrow: String {
@@ -116,14 +116,14 @@ add(P,
     }''')
 add(P,
     '''    private var detail: String {
-        guard let backedUpCount else { return "\(album.count.formatted()) items" }
-        if backedUpCount >= album.count, album.count > 0 { return "All \(album.count.formatted()) backed up" }
-        return "\(backedUpCount.formatted()) of \(album.count.formatted()) backed up"
+        guard let backedUpCount else { return "\\(album.count.formatted()) items" }
+        if backedUpCount >= album.count, album.count > 0 { return "All \\(album.count.formatted()) backed up" }
+        return "\\(backedUpCount.formatted()) of \\(album.count.formatted()) backed up"
     }''',
     '''    private var detail: String {
-        guard let backedUpCount else { return String(localized: "\(album.count.formatted()) items") }
-        if backedUpCount >= album.count, album.count > 0 { return String(localized: "All \(album.count.formatted()) backed up") }
-        return String(localized: "\(backedUpCount.formatted()) of \(album.count.formatted()) backed up")
+        guard let backedUpCount else { return String(localized: "\\(album.count.formatted()) items") }
+        if backedUpCount >= album.count, album.count > 0 { return String(localized: "All \\(album.count.formatted()) backed up") }
+        return String(localized: "\\(backedUpCount.formatted()) of \\(album.count.formatted()) backed up")
     }''')
 
 # ============ SettingsView.swift ============
@@ -154,7 +154,7 @@ add(P,
         switch account.status {
         case .loading: return "Looking for a saved credential"
         case .disconnected: return "Connect to start backing up"
-        case .connected(_, let since): return "Connected · \(since.formatted(date: .abbreviated, time: .omitted))"
+        case .connected(_, let since): return "Connected · \\(since.formatted(date: .abbreviated, time: .omitted))"
         case .rejected(_, let reason): return reason
         }
     }''',
@@ -171,7 +171,7 @@ add(P,
         switch account.status {
         case .loading: return String(localized: "Looking for a saved credential")
         case .disconnected: return String(localized: "Connect to start backing up")
-        case .connected(_, let since): return String(localized: "Connected · \(since.formatted(date: .abbreviated, time: .omitted))")
+        case .connected(_, let since): return String(localized: "Connected · \\(since.formatted(date: .abbreviated, time: .omitted))")
         case .rejected(_, let reason): return reason
         }
     }''')
@@ -243,8 +243,8 @@ add(P,
         if selectedAlbums.isEmpty { return "Choose albums first" }
         if queue.isUserPaused { return "Backup is paused" }
         let backedUp = selectedBackedUpCount
-        guard selectedItemCount > 0 else { return "\(selectedItemCount.formatted()) items" }
-        return "\(backedUp.formatted()) of \(selectedItemCount.formatted()) backed up"
+        guard selectedItemCount > 0 else { return "\\(selectedItemCount.formatted()) items" }
+        return "\\(backedUp.formatted()) of \\(selectedItemCount.formatted()) backed up"
     }''',
     '''        return Button(action: backUpSelectedAlbums) {
             quickActionLabel(symbol: "arrow.up.circle.fill",
@@ -259,8 +259,8 @@ add(P,
         if selectedAlbums.isEmpty { return String(localized: "Choose albums first") }
         if queue.isUserPaused { return String(localized: "Backup is paused") }
         let backedUp = selectedBackedUpCount
-        guard selectedItemCount > 0 else { return String(localized: "\(selectedItemCount.formatted()) items") }
-        return String(localized: "\(backedUp.formatted()) of \(selectedItemCount.formatted()) backed up")
+        guard selectedItemCount > 0 else { return String(localized: "\\(selectedItemCount.formatted()) items") }
+        return String(localized: "\\(backedUp.formatted()) of \\(selectedItemCount.formatted()) backed up")
     }''')
 add(P,
     'quickActionLabel(symbol: "photo.badge.plus", title: "Pick Photos", detail: "Manual backup", isEnabled: enabled)',
@@ -281,8 +281,8 @@ add(P,
     private var heroSubtitle: String {
         if !account.status.isUsable { return "Connect an account to get started" }
         if let reason = queue.pauseReason { return reason }
-        if !queue.isIdle { return "\(queue.activeCount) items remaining" }
-        if queue.failedCount > 0 { return "\(queue.failedCount) items failed — open Activity to retry" }
+        if !queue.isIdle { return "\\(queue.activeCount) items remaining" }
+        if queue.failedCount > 0 { return "\\(queue.failedCount) items failed — open Activity to retry" }
         if selectedAlbums.isEmpty { return "Choose albums to protect" }
         return "Your selected albums are up to date"
     }''',
@@ -298,23 +298,23 @@ add(P,
     private var heroSubtitle: String {
         if !account.status.isUsable { return String(localized: "Connect an account to get started") }
         if let reason = queue.pauseReason { return reason }
-        if !queue.isIdle { return String(localized: "\(queue.activeCount) items remaining") }
-        if queue.failedCount > 0 { return String(localized: "\(queue.failedCount) items failed — open Activity to retry") }
+        if !queue.isIdle { return String(localized: "\\(queue.activeCount) items remaining") }
+        if queue.failedCount > 0 { return String(localized: "\\(queue.failedCount) items failed — open Activity to retry") }
         if selectedAlbums.isEmpty { return String(localized: "Choose albums to protect") }
         return String(localized: "Your selected albums are up to date")
     }''')
 add(P,
     '''    private func progressLabel(for album: PhotoAlbum) -> String {
         guard let backedUp = albums.backedUpCounts[album.id] else {
-            return "\(album.count.formatted()) items"
+            return "\\(album.count.formatted()) items"
         }
-        return "\(backedUp.formatted()) of \(album.count.formatted()) backed up"
+        return "\\(backedUp.formatted()) of \\(album.count.formatted()) backed up"
     }''',
     '''    private func progressLabel(for album: PhotoAlbum) -> String {
         guard let backedUp = albums.backedUpCounts[album.id] else {
-            return String(localized: "\(album.count.formatted()) items")
+            return String(localized: "\\(album.count.formatted()) items")
         }
-        return String(localized: "\(backedUp.formatted()) of \(album.count.formatted()) backed up")
+        return String(localized: "\\(backedUp.formatted()) of \\(album.count.formatted()) backed up")
     }''')
 add(P,
     '''    static func message(for outcome: AutomaticBackupCoordinator.ManualRunOutcome) -> String {
@@ -322,8 +322,8 @@ add(P,
         case .noLibraryAccess: return "Allow photo access in Settings to back up your albums."
         case .noAlbumsSelected: return "Choose albums in the Albums tab first."
         case .nothingToDo: return "Everything in your selected albums is already backed up."
-        case .started(let count): return "Backing up \(count.formatted()) items. Watch progress in Activity."
-        case .rechecking(let count): return "Re-checking \(count.formatted()) items against Google Photos."
+        case .started(let count): return "Backing up \\(count.formatted()) items. Watch progress in Activity."
+        case .rechecking(let count): return "Re-checking \\(count.formatted()) items against Google Photos."
         }
     }
 
@@ -338,8 +338,8 @@ add(P,
         case .noLibraryAccess: return String(localized: "Allow photo access in Settings to back up your albums.")
         case .noAlbumsSelected: return String(localized: "Choose albums in the Albums tab first.")
         case .nothingToDo: return String(localized: "Everything in your selected albums is already backed up.")
-        case .started(let count): return String(localized: "Backing up \(count.formatted()) items. Watch progress in Activity.")
-        case .rechecking(let count): return String(localized: "Re-checking \(count.formatted()) items against Google Photos.")
+        case .started(let count): return String(localized: "Backing up \\(count.formatted()) items. Watch progress in Activity.")
+        case .rechecking(let count): return String(localized: "Re-checking \\(count.formatted()) items against Google Photos.")
         }
     }
 
@@ -407,11 +407,11 @@ add(P,
     'LabeledRow(String(localized: "iOS"), value: UIDevice.current.systemVersion)')
 add(P,
     '''                    Text(queue.failureCount > queue.recentFailures.count
-                         ? "\(queue.failureCount) failures this session; showing the \(queue.recentFailures.count) most recent."
-                         : "\(queue.failureCount) failures this session.")''',
+                         ? "\\(queue.failureCount) failures this session; showing the \\(queue.recentFailures.count) most recent."
+                         : "\\(queue.failureCount) failures this session.")''',
     '''                    Text(queue.failureCount > queue.recentFailures.count
-                         ? String(localized: "\(queue.failureCount) failures this session; showing the \(queue.recentFailures.count) most recent.")
-                         : String(localized: "\(queue.failureCount) failures this session."))''')
+                         ? String(localized: "\\(queue.failureCount) failures this session; showing the \\(queue.recentFailures.count) most recent.")
+                         : String(localized: "\\(queue.failureCount) failures this session."))''')
 
 # ============ DiagnosticEventsView.swift ============
 P = "App/Sources/DiagnosticEventsView.swift"
@@ -419,10 +419,10 @@ add(P,
     'Text(filter == .all ? "No events recorded yet." : "No warnings or errors.")',
     'Text(filter == .all ? String(localized: "No events recorded yet.") : String(localized: "No warnings or errors."))')
 add(P,
-    '''                    Text("Repeated \(event.occurrences) times"
-                         + (event.firstDate.map { " since \($0.formatted(date: .omitted, time: .shortened))" } ?? ""))''',
-    '''                    Text(String(localized: "Repeated \(event.occurrences) times")
-                         + (event.firstDate.map { String(localized: " since \($0.formatted(date: .omitted, time: .shortened))") } ?? ""))''')
+    '''                    Text("Repeated \\(event.occurrences) times"
+                         + (event.firstDate.map { " since \\($0.formatted(date: .omitted, time: .shortened))" } ?? ""))''',
+    '''                    Text(String(localized: "Repeated \\(event.occurrences) times")
+                         + (event.firstDate.map { String(localized: " since \\($0.formatted(date: .omitted, time: .shortened))") } ?? ""))''')
 add(P,
     'Text(run.source.rawValue).font(.subheadline.weight(.medium))',
     'Text(NSLocalizedString(run.source.rawValue, comment: "Backup run source")).font(.subheadline.weight(.medium))')
@@ -439,8 +439,8 @@ add(P,
     'Label(copied ? "Copied" : "Copy Report Text", systemImage: copied ? "checkmark" : "doc.on.doc")',
     'Label(copied ? String(localized: "Copied") : String(localized: "Copy Report Text"), systemImage: copied ? "checkmark" : "doc.on.doc")')
 add(P,
-    'errorMessage = "Could not create the report: \(error.localizedDescription)"',
-    'errorMessage = String(localized: "Could not create the report: \(error.localizedDescription)")')
+    'errorMessage = "Could not create the report: \\(error.localizedDescription)"',
+    'errorMessage = String(localized: "Could not create the report: \\(error.localizedDescription)")')
 
 # ============ DesignComponents.swift ============
 P = "App/Sources/DesignComponents.swift"
@@ -528,12 +528,12 @@ add(P,
 # ============ CredentialStore.swift ============
 P = "App/Sources/CredentialStore.swift"
 add(P,
-    '''                return "The Keychain refused the credential: \(detail)."
+    '''                return "The Keychain refused the credential: \\(detail)."
             case .bound:
                 return "Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound."
             case .corrupt:
                 return "The saved credential could not be read and has been discarded. Connect the account again."''',
-    '''                return String(localized: "The Keychain refused the credential: \(detail).")
+    '''                return String(localized: "The Keychain refused the credential: \\(detail).")
             case .bound:
                 return String(localized: "Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound.")
             case .corrupt:
@@ -579,8 +579,8 @@ add(P,
 # ============ ContinuedBackup.swift ============
 P = "App/Sources/ContinuedBackup.swift"
 add(P,
-    'reason ?? "\(completed.formatted()) of \(total.formatted()) done"',
-    'reason ?? String(localized: "\(completed.formatted()) of \(total.formatted()) done")')
+    'reason ?? "\\(completed.formatted()) of \\(total.formatted()) done"',
+    'reason ?? String(localized: "\\(completed.formatted()) of \\(total.formatted()) done")')
 add(P,
     'static let title = "Backing up to Google Photos"',
     'static let title = String(localized: "Backing up to Google Photos")')
@@ -588,8 +588,8 @@ add(P,
 # ============ UploadQueue.swift ============
 P = "App/Sources/UploadQueue.swift"
 add(P, 'case .queued: return "Waiting"', 'case .queued: return String(localized: "Waiting")')
-add(P, 'case .waitingToRetry(let attempt): return "Retrying (attempt \(attempt + 1))"',
-    'case .waitingToRetry(let attempt): return String(localized: "Retrying (attempt \(attempt + 1))")')
+add(P, 'case .waitingToRetry(let attempt): return "Retrying (attempt \\(attempt + 1))"',
+    'case .waitingToRetry(let attempt): return String(localized: "Retrying (attempt \\(attempt + 1))")')
 add(P, 'case .waitingForICloud: return "Will download from iCloud when you open the app"',
     'case .waitingForICloud: return String(localized: "Will download from iCloud when you open the app")')
 add(P, 'case .exporting: return "Preparing"', 'case .exporting: return String(localized: "Preparing")')
@@ -603,20 +603,20 @@ add(P, 'case .cancelled: return "Stopped by you"', 'case .cancelled: return Stri
 add(P, 'name: String = "Preparing…"', 'name: String = String(localized: "Preparing…")')
 add(P, '?? (isUserPaused ? "You paused backup. Tap Resume to continue." : nil)',
     '?? (isUserPaused ? String(localized: "You paused backup. Tap Resume to continue.") : nil)')
-add(P, 'persistenceWarning = "Upload completion could not be saved: \(error.localizedDescription)"',
-    'persistenceWarning = String(localized: "Upload completion could not be saved: \(error.localizedDescription)")', 2)
-add(P, 'persistenceWarning = "The saved upload queue could not be restored: \(error.localizedDescription)"',
-    'persistenceWarning = String(localized: "The saved upload queue could not be restored: \(error.localizedDescription)")')
-add(P, 'persistenceWarning = "Upload progress could not be saved: \(error.localizedDescription)"',
-    'persistenceWarning = String(localized: "Upload progress could not be saved: \(error.localizedDescription)")')
+add(P, 'persistenceWarning = "Upload completion could not be saved: \\(error.localizedDescription)"',
+    'persistenceWarning = String(localized: "Upload completion could not be saved: \\(error.localizedDescription)")', 2)
+add(P, 'persistenceWarning = "The saved upload queue could not be restored: \\(error.localizedDescription)"',
+    'persistenceWarning = String(localized: "The saved upload queue could not be restored: \\(error.localizedDescription)")')
+add(P, 'persistenceWarning = "Upload progress could not be saved: \\(error.localizedDescription)"',
+    'persistenceWarning = String(localized: "Upload progress could not be saved: \\(error.localizedDescription)")')
 add(P, 'let nextReason = allowed ? nil : (pauseReason ?? "Waiting for an allowed connection")',
     'let nextReason = allowed ? nil : (pauseReason ?? String(localized: "Waiting for an allowed connection"))')
 add(P, 'systemPauseReason = "Paused until iOS gives the app more time"',
     'systemPauseReason = String(localized: "Paused until iOS gives the app more time")')
 add(P, 'let interrupted = "Backing this item up kept being interrupted before it finished."',
     'let interrupted = String(localized: "Backing this item up kept being interrupted before it finished.")')
-add(P, 'rateLimitPauseReason = "Google asked the app to slow down. Backup continues in "\n            + (minutes <= 1 ? "a minute." : "\(minutes) minutes.")',
-    'rateLimitPauseReason = String(localized: "Google asked the app to slow down. Backup continues in ")\n            + (minutes <= 1 ? String(localized: "a minute.") : String(localized: "\(minutes) minutes."))')
+add(P, 'rateLimitPauseReason = "Google asked the app to slow down. Backup continues in "\n            + (minutes <= 1 ? "a minute." : "\\(minutes) minutes.")',
+    'rateLimitPauseReason = String(localized: "Google asked the app to slow down. Backup continues in ")\n            + (minutes <= 1 ? String(localized: "a minute.") : String(localized: "\\(minutes) minutes."))')
 add(P, 'recordFailure(name: "Backup stopped", reason: error.message, status: error.status)',
     'recordFailure(name: String(localized: "Backup stopped"), reason: error.message, status: error.status)')
 add(P, 'case .exporting: return "exporting it from Photos"', 'case .exporting: return String(localized: "exporting it from Photos")')
@@ -649,23 +649,23 @@ add(P, 'return UIApplication.shared.isProtectedDataAvailable\n                ? 
     'return UIApplication.shared.isProtectedDataAvailable\n                ? String(localized: "No Google account is connected")\n                : String(localized: "No Google account is available — if the iPhone has not been unlocked since it restarted, the saved account cannot be read yet")')
 add(P, 'summary = "interrupted when the app left the foreground or the selection changed"',
     'summary = String(localized: "interrupted when the app left the foreground or the selection changed")')
-add(P, 'summary = "no photo library access (\(DiagnosticReportBuilder.photoAuthorization()))"',
-    'summary = String(localized: "no photo library access (\(DiagnosticReportBuilder.photoAuthorization()))")')
-add(P, 'summary = "backed up \(completed); \(queue.failedCount) failed; \(queue.activeCount) unfinished"\n                + (queue.pauseReason.map { "; paused: \($0)" } ?? "")',
-    'summary = String(localized: "backed up \(completed); \(queue.failedCount) failed; \(queue.activeCount) unfinished")\n                + (queue.pauseReason.map { String(localized: "; paused: \($0)") } ?? "")')
-add(P, 'if total < 90 { return "\(total) s" }', 'if total < 90 { return String(localized: "\(total) s") }')
-add(P, 'if minutes < 90 { return "\(minutes) min" }', 'if minutes < 90 { return String(localized: "\(minutes) min") }')
-add(P, 'if hours < 48 { return "\(hours) h \(minutes % 60) min" }',
-    'if hours < 48 { return String(localized: "\(hours) h \(minutes % 60) min") }')
-add(P, 'return "\(hours / 24) days"', 'return String(localized: "\(hours / 24) days")')
+add(P, 'summary = "no photo library access (\\(DiagnosticReportBuilder.photoAuthorization()))"',
+    'summary = String(localized: "no photo library access (\\(DiagnosticReportBuilder.photoAuthorization()))")')
+add(P, 'summary = "backed up \\(completed); \\(queue.failedCount) failed; \\(queue.activeCount) unfinished"\n                + (queue.pauseReason.map { "; paused: \\($0)" } ?? "")',
+    'summary = String(localized: "backed up \\(completed); \\(queue.failedCount) failed; \\(queue.activeCount) unfinished")\n                + (queue.pauseReason.map { String(localized: "; paused: \\($0)") } ?? "")')
+add(P, 'if total < 90 { return "\\(total) s" }', 'if total < 90 { return String(localized: "\\(total) s") }')
+add(P, 'if minutes < 90 { return "\\(minutes) min" }', 'if minutes < 90 { return String(localized: "\\(minutes) min") }')
+add(P, 'if hours < 48 { return "\\(hours) h \\(minutes % 60) min" }',
+    'if hours < 48 { return String(localized: "\\(hours) h \\(minutes % 60) min") }')
+add(P, 'return "\\(hours / 24) days"', 'return String(localized: "\\(hours / 24) days")')
 add(P, 'let waiting = queue.rateLimitPauseReason == nil ? nil : "Waiting: Google asked the app to slow down"',
     'let waiting = queue.rateLimitPauseReason == nil ? nil : String(localized: "Waiting: Google asked the app to slow down")')
 add(P, 'let reason = idle ? "nothing is left to back up" : (queue.pauseReason ?? "nothing can move on its own")',
     'let reason = idle ? String(localized: "nothing is left to back up") : (queue.pauseReason ?? String(localized: "nothing can move on its own"))')
 add(P, '        let settled = max(0, queue.settledRowCount - run.settledBefore)\n',
-    '        let settled = max(0, queue.settledRowCount - run.settledBefore)\n        let settledText = settled == 1 ? String(localized: "1 item") : String(localized: "\(settled) items")\n')
-add(P, 'summary: "finished \(settled) item\(settled == 1 ? "" : "s"); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)"',
-    'summary: String(localized: "finished \(settledText); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)")')
+    '        let settled = max(0, queue.settledRowCount - run.settledBefore)\n        let settledText = settled == 1 ? String(localized: "1 item") : String(localized: "\\(settled) items")\n')
+add(P, 'summary: "finished \\(settled) item\\(settled == 1 ? "" : "s"); \\(queue.failedCount) failed; \\(queue.activeCount) unfinished; ended because \\(ending)"',
+    'summary: String(localized: "finished \\(settledText); \\(queue.failedCount) failed; \\(queue.activeCount) unfinished; ended because \\(ending)")')
 
 # ============ Apply ============
 failures = []
