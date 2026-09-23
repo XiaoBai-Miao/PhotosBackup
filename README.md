@@ -78,6 +78,21 @@ Photos credential, and an authenticated `photosdata-pa` request succeeds.
 The Xcode project, app target, and scheme are named `PhotosBackup`; the
 user-facing app is named **Photos Backup**.
 
+## Localization
+
+The app ships with **10 languages**: English (en), Simplified Chinese
+(zh-Hans), Japanese (ja), Korean (ko), French (fr), German (de), Spanish (es),
+Italian (it), Brazilian Portuguese (pt-BR), and Russian (ru). You can switch
+language anytime in **iOS Settings → Photos Backup → Language** — no reinstall
+needed. All UI strings, the app display name, and the photo-library permission
+message follow the selected language; untranslated keys fall back to English.
+
+Translation tables live in `App/Resources/<lang>.lproj/Localizable.strings`
+(356 keys each, identical across languages). `App/Resources/Info.plist`
+declares the supported languages in `CFBundleLocalizations`. Run
+`python3 Scripts/verify_localization.py` to check key parity, syntax, and
+format-specifier consistency across all languages.
+
 Latest release: **0.3.7** ([releases](https://github.com/g8row/PhotosBackup/releases)).
 Every push and pull request runs the suite on an iPhone simulator: 191 tests,
 189 pass, 0 fail. The 2 opt-in live tests are skipped.
