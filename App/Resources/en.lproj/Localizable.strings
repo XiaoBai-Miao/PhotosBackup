@@ -267,8 +267,6 @@
 "Repeated %lld times" = "Repeated %lld times";
 " since %@" = " since %@";
 "App open" = "App open";
-"Back Up Now" = "Back Up Now";
-"Re-check Backups" = "Re-check Backups";
 "iOS background processing" = "iOS background processing";
 "Shortcuts automation" = "Shortcuts automation";
 "Background transfer completion" = "Background transfer completion";

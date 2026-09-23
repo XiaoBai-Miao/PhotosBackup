@@ -265,8 +265,6 @@
 "Repeated %lld times" = "重复 %lld 次";
 " since %@" = "，自 %@ 起";
 "App open" = "打开应用";
-"Back Up Now" = "立即备份";
-"Re-check Backups" = "重新检查备份";
 "iOS background processing" = "iOS 后台处理";
 "Shortcuts automation" = "快捷指令自动化";
 "Background transfer completion" = "后台传输完成";
