@@ -27,6 +27,8 @@ targets:
       - path: App/Sources
       - path: GPMC/Core
       - path: App/Resources
+        excludes:
+          - Info.plist
         buildPhase: resources
     settings:
       base:
