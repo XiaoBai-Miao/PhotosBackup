@@ -1,0 +1,5 @@
+/* App display name */
+"CFBundleDisplayName" = "Photos Backup";
+
+/* Photo library usage description */
+"NSPhotoLibraryUsageDescription" = "O Photos Backup precisa de acesso aos álbuns e fotos que você escolher para poder fazer backup deles com segurança no Google Fotos.";

@@ -16,12 +16,12 @@
 
 ## 多语言支持（本次新增）
 
-从 0.3.7 起，应用内置 **英文（en）** 与 **简体中文（zh-Hans）** 两种语言：
+应用内置 **10 种语言**：英文（en）、简体中文（zh-Hans）、日语（ja）、韩语（ko）、法语（fr）、德语（de）、西班牙语（es）、意大利语（it）、巴西葡萄牙语（pt-BR）、俄语（ru）：
 
 - 在 **iOS 系统设置 → Photos Backup → 语言（Language）** 中即可切换，无需重新安装。
 - 切换后立即生效：界面文案、应用显示名称、相册权限说明都会跟随系统所选语言。
-- 应用显示名称在中文环境下为「照片备份」，英文环境下为 "Photos Backup"。
-- 翻译表位于 `App/Resources/{en,zh-Hans}.lproj/Localizable.strings`，两套各 356 条，一一对应。
+- 应用显示名称在中文环境下为「照片备份」，日文环境下为「フォトバックアップ」，韩文环境下为「포토 백업」，其余语言保持 "Photos Backup"。
+- 翻译表位于 `App/Resources/<语言代码>.lproj/Localizable.strings`，十套各 356 条，key 一一对应。
 - 代码中所有用户可见文案均通过 `String(localized:)` 取翻译，未匹配到翻译时自动回退英文。
 
 ### 如何添加更多语言
@@ -29,7 +29,7 @@
 1. 新建目录 `App/Resources/<语言代码>.lproj/`（如法语 `fr.lproj`），放入 `Localizable.strings`，key 与英文表完全一致，右侧写对应翻译。
 2. 在 `App/Resources/Info.plist` 的 `CFBundleLocalizations` 数组中追加该语言代码（如 `<string>fr</string>`）。
 3. 可选：在该 `.lproj` 下添加 `InfoPlist.strings` 翻译应用名与权限文案。
-4. 运行 `python3 Scripts/verify_localization.py` 校验 key 配对与语法，然后重新构建。
+4. 运行 `python3 Scripts/verify_localization.py` 校验全部语言的 key 配对、语法与格式符一致性，然后重新构建。
 
 > [!NOTE]
 > 使用 `String(localized:)` 需要最低系统版本 **iOS 16.0**，因此本项目的最低支持版本已从 iOS 15.0 提升至 16.0。

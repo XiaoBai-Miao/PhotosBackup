@@ -1,0 +1,5 @@
+/* App display name */
+"CFBundleDisplayName" = "フォトバックアップ";
+
+/* Photo library usage description */
+"NSPhotoLibraryUsageDescription" = "Photos Backup は、選択したアルバムと写真にアクセスして、Google フォトに安全にバックアップする必要があります。";

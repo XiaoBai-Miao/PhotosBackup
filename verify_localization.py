@@ -175,5 +175,44 @@ print("\nentries in en table not matched by code scan (informational): %d" % len
 for k in unused:
     print("  maybe-unused:", k)
 
+
+print("\n== multi-language parity ==")
+LANGS = ["zh-Hans", "ja", "ko", "fr", "de", "es", "it", "pt-BR", "ru"]
+# 品牌/专有名词在目标语言中同形属合理保留
+BRAND_KEYS = {"Photos Backup", "Photos Backup Connect", "iOS", "GPMC by xob0t", "G",
+              "Home", "Albums", "Activity", "App", "Support", "Backup", "Uploads",
+              "Item", "Pause", "Diagnostics", "All", "Show", "Waiting", "Done", "Retry",
+              "Version", "Extensions", "code %lld", "%lld minutes.", "%lld s",
+              "%lld min", "%lld h %lld min", "1 item"}
+fmt_re = re.compile(r'%(?:\d+\$)?[@dDiuUxXoOfeEgGcCsS]|%lld|%[0-9.]*[fF]|%%')
+
+for lang in LANGS:
+    lp = os.path.join(ROOT, "App/Resources/%s.lproj/Localizable.strings" % lang)
+    lt, lerr = parse_strings(lp)
+    if lerr:
+        ok = False
+        print("%s: SYNTAX ERRORS %d" % (lang, len(lerr)))
+        continue
+    miss = set(en) - set(lt)
+    extra = set(lt) - set(en)
+    fmts_mismatch = [k for k in en if fmt_re.findall(k) != fmt_re.findall(lt.get(k, ""))]
+    fallback = [k for k, v in lt.items() if v == k and k not in BRAND_KEYS and len(k) > 2]
+    issues = []
+    if miss: issues.append("missing %d" % len(miss))
+    if extra: issues.append("extra %d" % len(extra))
+    if fmts_mismatch: issues.append("format-mismatch %d" % len(fmts_mismatch))
+    if fallback: issues.append("fallback %d" % len(fallback))
+    if issues:
+        ok = False
+        print("%s: FAIL %s (keys=%d)" % (lang, ", ".join(issues), len(lt)))
+        for k in sorted(miss)[:5]: print("   miss:", k[:70])
+        for k in sorted(extra)[:5]: print("   extra:", k[:70])
+        for k in fmts_mismatch[:5]: print("   fmt:", k[:50], "=>", lt.get(k, "")[:50])
+        for k in fallback[:5]: print("   fallback:", k[:70])
+    else:
+        print("%s: OK (keys=%d)" % (lang, len(lt)))
+
+
+
 print("\nRESULT:", "PASS" if ok else "FAIL")
 sys.exit(0 if ok else 1)
