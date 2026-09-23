@@ -1,6 +1,11 @@
 # Photos Backup for iOS
 
 <p align="center">
+  <strong><a href="README.md">English</a></strong> |
+  <strong><a href="README_cn.md">简体中文</a></strong>
+</p>
+
+<p align="center">
   <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" width="160" alt="Photos Backup app icon">
 </p>
 
@@ -113,7 +118,7 @@ or so after the crash.
 
 - macOS with Xcode 16.4 and an installed iOS Simulator runtime
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.40 or newer
-- iOS 15.0 or newer
+- iOS 16.0 or newer
 - A Google account for the live connection flow
 - For a physical device: an Apple signing identity, or a sideloading tool such
   as SideStore or AltStore

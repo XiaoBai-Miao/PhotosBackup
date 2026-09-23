@@ -1,6 +1,11 @@
 # Photos Backup for iOS（中文说明）
 
 <p align="center">
+  <strong><a href="README.md">English</a></strong> |
+  <strong><a href="README_cn.md">简体中文</a></strong>
+</p>
+
+<p align="center">
   <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png" width="160" alt="Photos Backup 应用图标">
 </p>
 
