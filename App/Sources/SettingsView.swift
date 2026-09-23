@@ -56,7 +56,7 @@ struct SettingsView: View {
                 Image(systemName: account.status.isUsable ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .font(.title2)
                     .foregroundStyle(account.status.isUsable ? Color.green : Color.orange)
-                    .accessibilityLabel(account.status.isUsable ? String(localized: "Connected") : String(localized: "Action needed"))
+                    .accessibilityLabel(account.status.isUsable ? NSLocalizedString("Connected", comment: "") : NSLocalizedString("Action needed", comment: ""))
             }
             .padding(.vertical, 4)
 
@@ -71,7 +71,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Text(account.verifying ? String(localized: "Checking Connection…") : String(localized: "Check Connection"))
+                        Text(account.verifying ? NSLocalizedString("Checking Connection…", comment: "") : NSLocalizedString("Check Connection", comment: ""))
                         Spacer()
                         if account.verifying {
                             ProgressView()
@@ -101,7 +101,7 @@ struct SettingsView: View {
                     Label("Not saved to Keychain", systemImage: "key.slash")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
-                    Text(warning + " " + String(localized: "The account works for this session but may need to be connected again after relaunch."))
+                    Text(warning + " " + NSLocalizedString("The account works for this session but may need to be connected again after relaunch.", comment: ""))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -146,7 +146,7 @@ struct SettingsView: View {
                 runVerification()
             } label: {
                 HStack {
-                    Text(isVerifying ? String(localized: "Re-checking…") : String(localized: "Re-check Backups"))
+                    Text(isVerifying ? NSLocalizedString("Re-checking…", comment: "") : NSLocalizedString("Re-check Backups", comment: ""))
                     Spacer()
                     if isVerifying { ProgressView() }
                 }
@@ -203,10 +203,10 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section("About") {
-            LabeledRow(String(localized: "App"), value: String(localized: "Photos Backup"))
-            LabeledRow(String(localized: "Version"), value: appVersion)
-            LabeledRow(String(localized: "iOS"), value: UIDevice.current.systemVersion)
-            LabeledRow(String(localized: "Core technology")) {
+            LabeledRow(NSLocalizedString("App", comment: ""), value: NSLocalizedString("Photos Backup", comment: ""))
+            LabeledRow(NSLocalizedString("Version", comment: ""), value: appVersion)
+            LabeledRow(NSLocalizedString("iOS", comment: ""), value: UIDevice.current.systemVersion)
+            LabeledRow(NSLocalizedString("Core technology", comment: "")) {
                 Link("GPMC by xob0t", destination: gpmcURL)
             }
         }
@@ -214,18 +214,18 @@ struct SettingsView: View {
 
     private var accountTitle: String {
         switch account.status {
-        case .loading: return String(localized: "Checking account…")
-        case .disconnected: return String(localized: "Not connected")
+        case .loading: return NSLocalizedString("Checking account…", comment: "")
+        case .disconnected: return NSLocalizedString("Not connected", comment: "")
         case .connected(let email, _): return email
-        case .rejected(let email, _): return email.isEmpty ? String(localized: "Sign in again") : email
+        case .rejected(let email, _): return email.isEmpty ? NSLocalizedString("Sign in again", comment: "") : email
         }
     }
 
     private var accountSubtitle: String {
         switch account.status {
-        case .loading: return String(localized: "Looking for a saved credential")
-        case .disconnected: return String(localized: "Connect to start backing up")
-        case .connected(_, let since): return String(localized: "Connected · \(since.formatted(date: .abbreviated, time: .omitted))")
+        case .loading: return NSLocalizedString("Looking for a saved credential", comment: "")
+        case .disconnected: return NSLocalizedString("Connect to start backing up", comment: "")
+        case .connected(_, let since): return NSLocalizedString("Connected · \(since.formatted(date: .abbreviated, time: .omitted))", comment: "")
         case .rejected(_, let reason): return reason
         }
     }

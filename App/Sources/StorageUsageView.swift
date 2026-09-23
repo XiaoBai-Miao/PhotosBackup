@@ -8,13 +8,13 @@ struct StorageUsageView: View {
     var body: some View {
         List {
             Section("Used by Photos Backup") {
-                storageRow(String(localized: "Pending upload copies"), bytes: snapshot?.stagedUploads)
-                storageRow(String(localized: "Backup history and queue"), bytes: snapshot?.backupRecords)
-                storageRow(String(localized: "Completed transfer receipts"), bytes: snapshot?.transferResults)
+                storageRow(NSLocalizedString("Pending upload copies", comment: ""), bytes: snapshot?.stagedUploads)
+                storageRow(NSLocalizedString("Backup history and queue", comment: ""), bytes: snapshot?.backupRecords)
+                storageRow(NSLocalizedString("Completed transfer receipts", comment: ""), bytes: snapshot?.transferResults)
             }
 
             Section("System-managed") {
-                storageRow(String(localized: "Network and web caches"), bytes: snapshot?.caches)
+                storageRow(NSLocalizedString("Network and web caches", comment: ""), bytes: snapshot?.caches)
             }
 
             Section {

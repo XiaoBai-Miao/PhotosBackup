@@ -52,19 +52,19 @@ struct UploadItem: Identifiable, Equatable, Sendable {
         }
         var label: String {
             switch self {
-            case .queued: return String(localized: "Waiting")
-            case .waitingToRetry(let attempt): return String(localized: "Retrying (attempt \(attempt + 1))")
-            case .waitingForICloud: return String(localized: "Will download from iCloud when you open the app")
-            case .exporting: return String(localized: "Preparing")
-            case .hashing: return String(localized: "Checking")
-            case .checkingDuplicate: return String(localized: "Looking for a copy")
-            case .uploading: return String(localized: "Uploading")
-            case .finalizing: return String(localized: "Finishing")
-            case .alreadyBackedUp: return String(localized: "Already backed up")
-            case .done: return String(localized: "Backed up")
+            case .queued: return NSLocalizedString("Waiting", comment: "")
+            case .waitingToRetry(let attempt): return NSLocalizedString("Retrying (attempt \(attempt + 1))", comment: "")
+            case .waitingForICloud: return NSLocalizedString("Will download from iCloud when you open the app", comment: "")
+            case .exporting: return NSLocalizedString("Preparing", comment: "")
+            case .hashing: return NSLocalizedString("Checking", comment: "")
+            case .checkingDuplicate: return NSLocalizedString("Looking for a copy", comment: "")
+            case .uploading: return NSLocalizedString("Uploading", comment: "")
+            case .finalizing: return NSLocalizedString("Finishing", comment: "")
+            case .alreadyBackedUp: return NSLocalizedString("Already backed up", comment: "")
+            case .done: return NSLocalizedString("Backed up", comment: "")
             // Only ever the user's own doing now, so it says so: "Cancelled"
             // on its own read as a failure the app would not explain.
-            case .cancelled: return String(localized: "Stopped by you")
+            case .cancelled: return NSLocalizedString("Stopped by you", comment: "")
             case .failed(let reason, _): return reason
             }
         }
@@ -82,7 +82,7 @@ struct UploadItem: Identifiable, Equatable, Sendable {
     /// See `UploadQueue.noteInterruptedPreparations`.
     var interruptedPreparations = 0
 
-    init(id: UUID = UUID(), source: MediaSource, name: String = String(localized: "Preparing…")) {
+    init(id: UUID = UUID(), source: MediaSource, name: String = NSLocalizedString("Preparing…", comment: "")) {
         self.id = id; self.source = source; self.name = name
         byteCount = 0; state = .queued; attempts = 0
     }
@@ -360,7 +360,7 @@ final class UploadQueue: ObservableObject {
     var hasWorkableItems: Bool { counts.unfinished > counts.waitingForICloud }
     var pauseReason: String? {
         haltReason
-            ?? (isUserPaused ? String(localized: "You paused backup. Tap Resume to continue.") : nil)
+            ?? (isUserPaused ? NSLocalizedString("You paused backup. Tap Resume to continue.", comment: "") : nil)
             ?? networkPauseReason
             ?? systemPauseReason
             ?? rateLimitPauseReason
@@ -667,7 +667,7 @@ final class UploadQueue: ObservableObject {
                 if completionLedgerHealthy { persistenceWarning = nil }
             } catch {
                 completionLedgerHealthy = false
-                persistenceWarning = String(localized: "Upload completion could not be saved: \(error.localizedDescription)")
+                persistenceWarning = NSLocalizedString("Upload completion could not be saved: \(error.localizedDescription)", comment: "")
             }
         }
         persistNow()
@@ -765,7 +765,7 @@ final class UploadQueue: ObservableObject {
             if !interrupted.isEmpty { noteInterruptedPreparations(interrupted) }
             pump()
         } catch {
-            persistenceWarning = String(localized: "The saved upload queue could not be restored: \(error.localizedDescription)")
+            persistenceWarning = NSLocalizedString("The saved upload queue could not be restored: \(error.localizedDescription)", comment: "")
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Queue restore failed: \(error.localizedDescription)",
@@ -793,7 +793,7 @@ final class UploadQueue: ObservableObject {
     /// transport cancels in-flight work and requeues it so no upload can leak
     /// onto cellular after Wi-Fi disappears.
     func setNetworkAccess(allowed: Bool, pauseReason: String? = nil) {
-        let nextReason = allowed ? nil : (pauseReason ?? String(localized: "Waiting for an allowed connection"))
+        let nextReason = allowed ? nil : (pauseReason ?? NSLocalizedString("Waiting for an allowed connection", comment: ""))
         guard networkPauseReason != nextReason else { return }
         networkPauseReason = nextReason
         DiagnosticEventLog.shared.record(
@@ -827,7 +827,7 @@ final class UploadQueue: ObservableObject {
     /// Called by the background-task expiration handler. Work remains queued
     /// for the next system execution window or foreground launch.
     func suspendForBackgroundExpiration() {
-        systemPauseReason = String(localized: "Paused until iOS gives the app more time")
+        systemPauseReason = NSLocalizedString("Paused until iOS gives the app more time", comment: "")
         setPreparationGuardArmed(false)
         DiagnosticEventLog.shared.record(
             "queue",
@@ -1051,7 +1051,7 @@ final class UploadQueue: ObservableObject {
                     persist()
                     scheduleRetry(id, after: min(30, pow(2, Double(attempt))))
                 } else {
-                    let interrupted = String(localized: "Backing this item up kept being interrupted before it finished.")
+                    let interrupted = NSLocalizedString("Backing this item up kept being interrupted before it finished.", comment: "")
                     setState(.failed(reason: interrupted, retryable: true), at: index)
                     recordFailure(name: items[index].name, reason: interrupted, status: nil, stage: stage)
                     cleanCheckpoint(for: index)
@@ -1135,7 +1135,7 @@ final class UploadQueue: ObservableObject {
     private func halt(_ error: GPMCError) {
         guard haltReason == nil else { return }
         haltReason = error.message
-        recordFailure(name: String(localized: "Backup stopped"), reason: error.message, status: error.status)
+        recordFailure(name: NSLocalizedString("Backup stopped", comment: ""), reason: error.message, status: error.status)
         DiagnosticEventLog.shared.record(
             "queue",
             error.kind == .storageFull
@@ -1169,12 +1169,12 @@ final class UploadQueue: ObservableObject {
     /// What a row was doing, for a sentence that says where a failure happened.
     static func stageDescription(_ state: UploadItem.State) -> String {
         switch state {
-        case .exporting: return String(localized: "exporting it from Photos")
-        case .hashing: return String(localized: "reading the file")
-        case .checkingDuplicate: return String(localized: "asking Google for an existing copy")
-        case .uploading: return String(localized: "uploading")
-        case .finalizing: return String(localized: "finishing it in Google Photos")
-        default: return String(localized: "starting")
+        case .exporting: return NSLocalizedString("exporting it from Photos", comment: "")
+        case .hashing: return NSLocalizedString("reading the file", comment: "")
+        case .checkingDuplicate: return NSLocalizedString("asking Google for an existing copy", comment: "")
+        case .uploading: return NSLocalizedString("uploading", comment: "")
+        case .finalizing: return NSLocalizedString("finishing it in Google Photos", comment: "")
+        default: return NSLocalizedString("starting", comment: "")
         }
     }
 
@@ -1200,8 +1200,8 @@ final class UploadQueue: ObservableObject {
         let delay = rateLimitDelay
         rateLimitDelay = min(Self.rateLimitMaxDelay, rateLimitDelay * 2)
         let minutes = Int(delay / 60)
-        rateLimitPauseReason = String(localized: "Google asked the app to slow down. Backup continues in ")
-            + (minutes <= 1 ? String(localized: "a minute.") : String(localized: "\(minutes) minutes."))
+        rateLimitPauseReason = NSLocalizedString("Google asked the app to slow down. Backup continues in ", comment: "")
+            + (minutes <= 1 ? NSLocalizedString("a minute.", comment: "") : NSLocalizedString("\(minutes) minutes.", comment: ""))
         DiagnosticEventLog.shared.record(
             "queue",
             "Google limited how many requests the app may make, so new work waits \(Int(delay)) s: \(reason)",
@@ -1302,7 +1302,7 @@ final class UploadQueue: ObservableObject {
             try persistence.save(snapshot)
             if completionLedgerHealthy { persistenceWarning = nil }
         } catch {
-            persistenceWarning = String(localized: "Upload progress could not be saved: \(error.localizedDescription)")
+            persistenceWarning = NSLocalizedString("Upload progress could not be saved: \(error.localizedDescription)", comment: "")
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Queue save failed: \(error.localizedDescription)",
@@ -1319,7 +1319,7 @@ final class UploadQueue: ObservableObject {
             try persistence.recordCompletedSourceKey(key, for: accountIdentifier)
         } catch {
             completionLedgerHealthy = false
-            persistenceWarning = String(localized: "Upload completion could not be saved: \(error.localizedDescription)")
+            persistenceWarning = NSLocalizedString("Upload completion could not be saved: \(error.localizedDescription)", comment: "")
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Completion ledger save failed: \(error.localizedDescription)",
@@ -1359,7 +1359,7 @@ final class UploadQueue: ObservableObject {
     /// to stage, say — is the first thing every relaunch restarts, so the app
     /// closes again on every open and nothing else ever backs up.
     private func noteInterruptedPreparations(_ ids: Set<UUID>) {
-        let reason = String(localized: "Photos Backup closed unexpectedly more than once while preparing this item, so it was skipped to let the rest of the backup continue. Retry it from here, and please send a diagnostic report.")
+        let reason = NSLocalizedString("Photos Backup closed unexpectedly more than once while preparing this item, so it was skipped to let the rest of the backup continue. Retry it from here, and please send a diagnostic report.", comment: "")
         var movedToBack: [UploadItem] = []
         var skipped = 0
         for index in items.indices where ids.contains(items[index].id) && items[index].state == .queued {

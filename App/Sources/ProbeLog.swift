@@ -55,15 +55,15 @@ final class ProbeLog: ObservableObject {
 
     init() {
         steps = [
-            ProbeStep(id: Self.build, title: String(localized: "App build & launch")),
-            ProbeStep(id: Self.extensionEnabled, title: String(localized: "Google sign-in completed in-app")),
-            ProbeStep(id: Self.hostPermission, title: String(localized: "oauth_token cookie present")),
-            ProbeStep(id: Self.cookieRead, title: String(localized: "App reads the oauth_token cookie")),
-            ProbeStep(id: Self.nativeHandoff, title: String(localized: "Token captured from the web view")),
-            ProbeStep(id: Self.appIngest, title: String(localized: "App ingests the handed-off token (single use)")),
-            ProbeStep(id: Self.masterToken, title: String(localized: "Exchange oauth_token → Android master token")),
-            ProbeStep(id: Self.photosToken, title: String(localized: "Exchange master token → Photos access token")),
-            ProbeStep(id: Self.readAccess, title: String(localized: "Read-only Photos request succeeds")),
+            ProbeStep(id: Self.build, title: NSLocalizedString("App build & launch", comment: "")),
+            ProbeStep(id: Self.extensionEnabled, title: NSLocalizedString("Google sign-in completed in-app", comment: "")),
+            ProbeStep(id: Self.hostPermission, title: NSLocalizedString("oauth_token cookie present", comment: "")),
+            ProbeStep(id: Self.cookieRead, title: NSLocalizedString("App reads the oauth_token cookie", comment: "")),
+            ProbeStep(id: Self.nativeHandoff, title: NSLocalizedString("Token captured from the web view", comment: "")),
+            ProbeStep(id: Self.appIngest, title: NSLocalizedString("App ingests the handed-off token (single use)", comment: "")),
+            ProbeStep(id: Self.masterToken, title: NSLocalizedString("Exchange oauth_token → Android master token", comment: "")),
+            ProbeStep(id: Self.photosToken, title: NSLocalizedString("Exchange master token → Photos access token", comment: "")),
+            ProbeStep(id: Self.readAccess, title: NSLocalizedString("Read-only Photos request succeeds", comment: "")),
         ]
     }
 

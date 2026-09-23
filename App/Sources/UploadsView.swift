@@ -144,7 +144,7 @@ struct UploadsView: View {
 
     private var emptySection: some View {
         Section {
-            EmptyState(symbol: "tray", title: String(localized: "No backup activity"), message: String(localized: "Photos you back up manually or from selected albums will appear here."))
+            EmptyState(symbol: "tray", title: NSLocalizedString("No backup activity", comment: ""), message: NSLocalizedString("Photos you back up manually or from selected albums will appear here.", comment: ""))
                 .listRowBackground(Color.clear)
         }
     }
@@ -179,9 +179,9 @@ struct UploadsView: View {
 
     private var stopBackupMessage: String {
         if preferences.automaticBackup {
-            return String(localized: "Uploads in progress will be cancelled, the queue will be cleared, and Automatic Backup will be turned off. Photos already backed up are not affected.")
+            return NSLocalizedString("Uploads in progress will be cancelled, the queue will be cleared, and Automatic Backup will be turned off. Photos already backed up are not affected.", comment: "")
         }
-        return String(localized: "Uploads in progress will be cancelled and the queue will be cleared. Photos already backed up are not affected.")
+        return NSLocalizedString("Uploads in progress will be cancelled and the queue will be cleared. Photos already backed up are not affected.", comment: "")
     }
 
     private func stopBackup() {

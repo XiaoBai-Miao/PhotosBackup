@@ -83,21 +83,21 @@ struct DashboardView: View {
     @ViewBuilder private var accountBanner: some View {
         switch account.status {
         case .loading:
-            banner(color: .blue, symbol: "hourglass", title: String(localized: "Checking your account"), message: String(localized: "Just a moment…"))
+            banner(color: .blue, symbol: "hourglass", title: NSLocalizedString("Checking your account", comment: ""), message: NSLocalizedString("Just a moment…", comment: ""))
         case .disconnected:
             Button(action: onConnect) {
-                banner(color: .orange, symbol: "person.crop.circle.badge.exclamationmark", title: String(localized: "Connect Google Photos"), message: String(localized: "Sign in to start protecting your library"), showsChevron: true)
+                banner(color: .orange, symbol: "person.crop.circle.badge.exclamationmark", title: NSLocalizedString("Connect Google Photos", comment: ""), message: NSLocalizedString("Sign in to start protecting your library", comment: ""), showsChevron: true)
             }
             .buttonStyle(.plain)
         case .connected:
             if let warning = account.persistenceWarning {
-                banner(color: .orange, symbol: "key.slash", title: String(localized: "Not saved to Keychain"), message: warning, showsChevron: false)
+                banner(color: .orange, symbol: "key.slash", title: NSLocalizedString("Not saved to Keychain", comment: ""), message: warning, showsChevron: false)
             } else if let reason = queue.pauseReason {
-                banner(color: .orange, symbol: "pause.circle.fill", title: String(localized: "Backup paused"), message: reason, showsChevron: false)
+                banner(color: .orange, symbol: "pause.circle.fill", title: NSLocalizedString("Backup paused", comment: ""), message: reason, showsChevron: false)
             }
         case .rejected(_, let reason):
             Button(action: onConnect) {
-                banner(color: .red, symbol: "exclamationmark.arrow.circlepath", title: String(localized: "Sign in again"), message: reason, showsChevron: true)
+                banner(color: .red, symbol: "exclamationmark.arrow.circlepath", title: NSLocalizedString("Sign in again", comment: ""), message: reason, showsChevron: true)
             }
             .buttonStyle(.plain)
         }
@@ -127,11 +127,11 @@ struct DashboardView: View {
             Divider()
 
             HStack {
-                metric(value: queue.completedSourceCount.formatted(), label: String(localized: "Backed up"))
+                metric(value: queue.completedSourceCount.formatted(), label: NSLocalizedString("Backed up", comment: ""))
                 Divider().frame(height: 38)
-                metric(value: selectedAlbums.count.formatted(), label: String(localized: "Albums"))
+                metric(value: selectedAlbums.count.formatted(), label: NSLocalizedString("Albums", comment: ""))
                 Divider().frame(height: 38)
-                metric(value: queue.activeCount.formatted(), label: String(localized: "In queue"))
+                metric(value: queue.activeCount.formatted(), label: NSLocalizedString("In queue", comment: ""))
             }
 
             if !queue.isIdle || queue.isUserPaused {
@@ -193,7 +193,7 @@ struct DashboardView: View {
             && !isStartingManualRun && !queue.isUserPaused
         return Button(action: backUpSelectedAlbums) {
             quickActionLabel(symbol: "arrow.up.circle.fill",
-                             title: isStartingManualRun ? String(localized: "Checking…") : String(localized: "Back Up Now"),
+                             title: isStartingManualRun ? NSLocalizedString("Checking…", comment: "") : NSLocalizedString("Back Up Now", comment: ""),
                              detail: backUpActionDetail,
                              isEnabled: enabled)
         }
@@ -201,11 +201,11 @@ struct DashboardView: View {
     }
 
     private var backUpActionDetail: String {
-        if selectedAlbums.isEmpty { return String(localized: "Choose albums first") }
-        if queue.isUserPaused { return String(localized: "Backup is paused") }
+        if selectedAlbums.isEmpty { return NSLocalizedString("Choose albums first", comment: "") }
+        if queue.isUserPaused { return NSLocalizedString("Backup is paused", comment: "") }
         let backedUp = selectedBackedUpCount
-        guard selectedItemCount > 0 else { return String(localized: "\(selectedItemCount.formatted()) items") }
-        return String(localized: "\(backedUp.formatted()) of \(selectedItemCount.formatted()) backed up")
+        guard selectedItemCount > 0 else { return NSLocalizedString("\(selectedItemCount.formatted()) items", comment: "") }
+        return NSLocalizedString("\(backedUp.formatted()) of \(selectedItemCount.formatted()) backed up", comment: "")
     }
 
     /// Backed-up total for the selection, using the same "All Photos contains
@@ -220,7 +220,7 @@ struct DashboardView: View {
     private var photoPickerAction: some View {
         let enabled = account.status.isUsable
         return Button { showPicker = true } label: {
-            quickActionLabel(symbol: "photo.badge.plus", title: String(localized: "Pick Photos"), detail: String(localized: "Manual backup"), isEnabled: enabled)
+            quickActionLabel(symbol: "photo.badge.plus", title: NSLocalizedString("Pick Photos", comment: ""), detail: NSLocalizedString("Manual backup", comment: ""), isEnabled: enabled)
         }
         .disabled(!enabled)
     }
@@ -231,7 +231,7 @@ struct DashboardView: View {
                 Text("Selected Albums").font(.headline)
                 Spacer()
                 if preferences.automaticBackup {
-                    StatusPill(text: String(localized: "Automatic"), symbol: "arrow.triangle.2.circlepath", color: .green)
+                    StatusPill(text: NSLocalizedString("Automatic", comment: ""), symbol: "arrow.triangle.2.circlepath", color: .green)
                 }
             }
             if let manualRunMessage {
@@ -298,7 +298,7 @@ struct DashboardView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(account.status.isUsable ? String(localized: "Account connected") : String(localized: "Account not connected"))
+        .accessibilityLabel(account.status.isUsable ? NSLocalizedString("Account connected", comment: "") : NSLocalizedString("Account not connected", comment: ""))
         .accessibilityHint("Opens account settings")
     }
 
@@ -336,21 +336,21 @@ struct DashboardView: View {
     }
 
     private var heroTitle: String {
-        if !account.status.isUsable { return String(localized: "Connect to back up") }
-        if queue.pauseReason != nil { return String(localized: "Backup paused") }
-        if !queue.isIdle { return String(localized: "Backing up…") }
-        if queue.failedCount > 0 { return String(localized: "Backup needs attention") }
-        if queue.completedSourceCount == 0 { return String(localized: "Ready to back up") }
-        return String(localized: "Backup complete")
+        if !account.status.isUsable { return NSLocalizedString("Connect to back up", comment: "") }
+        if queue.pauseReason != nil { return NSLocalizedString("Backup paused", comment: "") }
+        if !queue.isIdle { return NSLocalizedString("Backing up…", comment: "") }
+        if queue.failedCount > 0 { return NSLocalizedString("Backup needs attention", comment: "") }
+        if queue.completedSourceCount == 0 { return NSLocalizedString("Ready to back up", comment: "") }
+        return NSLocalizedString("Backup complete", comment: "")
     }
 
     private var heroSubtitle: String {
-        if !account.status.isUsable { return String(localized: "Connect an account to get started") }
+        if !account.status.isUsable { return NSLocalizedString("Connect an account to get started", comment: "") }
         if let reason = queue.pauseReason { return reason }
-        if !queue.isIdle { return String(localized: "\(queue.activeCount) items remaining") }
-        if queue.failedCount > 0 { return String(localized: "\(queue.failedCount) items failed — open Activity to retry") }
-        if selectedAlbums.isEmpty { return String(localized: "Choose albums to protect") }
-        return String(localized: "Your selected albums are up to date")
+        if !queue.isIdle { return NSLocalizedString("\(queue.activeCount) items remaining", comment: "") }
+        if queue.failedCount > 0 { return NSLocalizedString("\(queue.failedCount) items failed — open Activity to retry", comment: "") }
+        if selectedAlbums.isEmpty { return NSLocalizedString("Choose albums to protect", comment: "") }
+        return NSLocalizedString("Your selected albums are up to date", comment: "")
     }
 
     private var heroProgress: Double {
@@ -373,9 +373,9 @@ struct DashboardView: View {
 
     private func progressLabel(for album: PhotoAlbum) -> String {
         guard let backedUp = albums.backedUpCounts[album.id] else {
-            return String(localized: "\(album.count.formatted()) items")
+            return NSLocalizedString("\(album.count.formatted()) items", comment: "")
         }
-        return String(localized: "\(backedUp.formatted()) of \(album.count.formatted()) backed up")
+        return NSLocalizedString("\(backedUp.formatted()) of \(album.count.formatted()) backed up", comment: "")
     }
 
     private func refreshBackedUpCounts() {
@@ -396,19 +396,19 @@ struct DashboardView: View {
 
     static func message(for outcome: AutomaticBackupCoordinator.ManualRunOutcome) -> String {
         switch outcome {
-        case .noLibraryAccess: return String(localized: "Allow photo access in Settings to back up your albums.")
-        case .noAlbumsSelected: return String(localized: "Choose albums in the Albums tab first.")
-        case .nothingToDo: return String(localized: "Everything in your selected albums is already backed up.")
-        case .started(let count): return String(localized: "Backing up \(count.formatted()) items. Watch progress in Activity.")
-        case .rechecking(let count): return String(localized: "Re-checking \(count.formatted()) items against Google Photos.")
+        case .noLibraryAccess: return NSLocalizedString("Allow photo access in Settings to back up your albums.", comment: "")
+        case .noAlbumsSelected: return NSLocalizedString("Choose albums in the Albums tab first.", comment: "")
+        case .nothingToDo: return NSLocalizedString("Everything in your selected albums is already backed up.", comment: "")
+        case .started(let count): return NSLocalizedString("Backing up \(count.formatted()) items. Watch progress in Activity.", comment: "")
+        case .rechecking(let count): return NSLocalizedString("Re-checking \(count.formatted()) items against Google Photos.", comment: "")
         }
     }
 
     private var stopBackupMessage: String {
         if preferences.automaticBackup {
-            return String(localized: "Uploads in progress will be cancelled, the queue will be cleared, and Automatic Backup will be turned off. Photos already backed up are not affected.")
+            return NSLocalizedString("Uploads in progress will be cancelled, the queue will be cleared, and Automatic Backup will be turned off. Photos already backed up are not affected.", comment: "")
         }
-        return String(localized: "Uploads in progress will be cancelled and the queue will be cleared. Photos already backed up are not affected.")
+        return NSLocalizedString("Uploads in progress will be cancelled and the queue will be cleared. Photos already backed up are not affected.", comment: "")
     }
 
     private func stopBackup() {

@@ -15,7 +15,7 @@ enum BackupShortcutBridge {
                 "Back Up Photos ran before the app finished starting, so nothing was done",
                 level: .warning
             )
-            return String(localized: "Open Photos Backup once, then run this shortcut again.")
+            return NSLocalizedString("Open Photos Backup once, then run this shortcut again.", comment: "")
         }
         let summary = await coordinator.performShortcutBackup().summary
         return summary.prefix(1).uppercased() + summary.dropFirst()

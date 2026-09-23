@@ -58,7 +58,7 @@ struct ContinuedBackupProgress: Equatable {
     }
 
     func subtitle(waitingFor reason: String?) -> String {
-        reason ?? String(localized: "\(completed.formatted()) of \(total.formatted()) done")
+        reason ?? NSLocalizedString("\(completed.formatted()) of \(total.formatted()) done", comment: "")
     }
 
     /// Units iOS sees per queue item, so a heartbeat can move the reported
@@ -93,7 +93,7 @@ struct ContinuedBackupProgress: Equatable {
 @available(iOS 26.0, *)
 @MainActor
 final class ContinuedBackupSession {
-    static let title = String(localized: "Backing up to Google Photos")
+    static let title = NSLocalizedString("Backing up to Google Photos", comment: "")
 
     /// iOS ended the task early: cancelled in the Live Activity, or the system
     /// needed the resources. Runs before iOS is told the task is over, which

@@ -27,7 +27,7 @@ struct DiagnosticEventsView: View {
 
             Section {
                 if visible.isEmpty {
-                    Text(filter == .all ? String(localized: "No events recorded yet.") : String(localized: "No warnings or errors."))
+                    Text(filter == .all ? NSLocalizedString("No events recorded yet.", comment: "") : NSLocalizedString("No warnings or errors.", comment: ""))
                         .foregroundStyle(.secondary)
                 }
                 ForEach(Array(visible.enumerated()), id: \.offset) { _, event in
@@ -96,8 +96,8 @@ private struct DiagnosticEventRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if event.occurrences > 1 {
-                    Text(String(localized: "Repeated \(event.occurrences) times")
-                         + (event.firstDate.map { String(localized: " since \($0.formatted(date: .omitted, time: .shortened))") } ?? ""))
+                    Text(NSLocalizedString("Repeated \(event.occurrences) times", comment: "")
+                         + (event.firstDate.map { NSLocalizedString(" since \($0.formatted(date: .omitted, time: .shortened))", comment: "") } ?? ""))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

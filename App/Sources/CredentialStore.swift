@@ -85,11 +85,11 @@ actor CredentialStore {
                 // don't add a second full stop.
                 let detail = (SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)")
                     .trimmingCharacters(in: CharacterSet(charactersIn: " ."))
-                return String(localized: "The Keychain refused the credential: \(detail).")
+                return NSLocalizedString("The Keychain refused the credential: \(detail).", comment: "")
             case .bound:
-                return String(localized: "Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound.")
+                return NSLocalizedString("Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound.", comment: "")
             case .corrupt:
-                return String(localized: "The saved credential could not be read and has been discarded. Connect the account again.")
+                return NSLocalizedString("The saved credential could not be read and has been discarded. Connect the account again.", comment: "")
             }
         }
     }
