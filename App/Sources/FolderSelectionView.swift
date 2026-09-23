@@ -29,7 +29,7 @@ struct FolderSelectionView: View {
                 } else if albums.isLoading {
                     ProgressView("Loading albums…")
                 } else if albums.albums.isEmpty {
-                    EmptyState(symbol: "rectangle.stack", title: "No albums found", message: "Albums from your Photos library will appear here.")
+                    EmptyState(symbol: "rectangle.stack", title: String(localized: "No albums found"), message: String(localized: "Albums from your Photos library will appear here."))
                 } else {
                     albumList
                 }
@@ -65,7 +65,7 @@ struct FolderSelectionView: View {
                 HStack(spacing: 10) {
                     Image(systemName: preferences.automaticBackup ? "arrow.triangle.2.circlepath.circle.fill" : "pause.circle.fill")
                         .foregroundStyle(preferences.automaticBackup ? .green : .orange)
-                    Text(preferences.automaticBackup ? "Selected albums back up automatically" : "Automatic backup is paused")
+                    Text(preferences.automaticBackup ? String(localized: "Selected albums back up automatically") : String(localized: "Automatic backup is paused"))
                         .font(.subheadline.weight(.medium))
                     Spacer()
                 }
@@ -112,7 +112,7 @@ struct FolderSelectionView: View {
     private var permissionState: some View {
         VStack(spacing: 18) {
             Spacer()
-            EmptyState(symbol: "photo.on.rectangle.angled", title: "See your albums", message: "Allow photo access to choose which albums Photos Backup should protect.")
+            EmptyState(symbol: "photo.on.rectangle.angled", title: String(localized: "See your albums"), message: String(localized: "Allow photo access to choose which albums Photos Backup should protect."))
             Button("Allow Photo Access") { Task { await albums.requestAccess() } }
                 .buttonStyle(PrimaryButtonStyle()).padding(.horizontal, 24)
             Spacer()
@@ -122,7 +122,7 @@ struct FolderSelectionView: View {
     private var deniedState: some View {
         VStack(spacing: 18) {
             Spacer()
-            EmptyState(symbol: "photo.badge.exclamationmark", title: "Photo access is off", message: "Allow access in Settings to choose albums and back up photos.")
+            EmptyState(symbol: "photo.badge.exclamationmark", title: String(localized: "Photo access is off"), message: String(localized: "Allow access in Settings to choose albums and back up photos."))
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
             }

@@ -29,7 +29,7 @@ struct DiagnosticReportView: View {
                     generate()
                 } label: {
                     HStack {
-                        Label(report == nil ? "Generate Report" : "Refresh Report", systemImage: "doc.text.magnifyingglass")
+                        Label(report == nil ? String(localized: "Generate Report") : String(localized: "Refresh Report"), systemImage: "doc.text.magnifyingglass")
                         Spacer()
                         if isGenerating { ProgressView() }
                     }
@@ -46,7 +46,7 @@ struct DiagnosticReportView: View {
                         UIPasteboard.general.string = report.text
                         copied = true
                     } label: {
-                        Label(copied ? "Copied" : "Copy Report Text", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        Label(copied ? String(localized: "Copied") : String(localized: "Copy Report Text"), systemImage: copied ? "checkmark" : "doc.on.doc")
                     }
                 }
 
@@ -104,7 +104,7 @@ struct DiagnosticReportView: View {
                     automaticBackup: automaticBackup
                 )
             } catch {
-                errorMessage = "Could not create the report: \(error.localizedDescription)"
+                errorMessage = String(localized: "Could not create the report: \(error.localizedDescription)")
                 DiagnosticEventLog.shared.record("support", "Could not create a diagnostic report: \(error.localizedDescription)", level: .error)
             }
             isGenerating = false

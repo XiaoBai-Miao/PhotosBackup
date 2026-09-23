@@ -16,7 +16,7 @@ struct DiagnosticsView: View {
     var body: some View {
         List {
             Section("Environment") {
-                LabeledRow("iOS", value: UIDevice.current.systemVersion)
+                LabeledRow(String(localized: "iOS"), value: UIDevice.current.systemVersion)
             }
 
             Section {
@@ -101,8 +101,8 @@ struct DiagnosticsView: View {
                     // The count is the part a bug report never has: one 400 and
                     // four hundred of them read identically on a cleared queue.
                     Text(queue.failureCount > queue.recentFailures.count
-                         ? "\(queue.failureCount) failures this session; showing the \(queue.recentFailures.count) most recent."
-                         : "\(queue.failureCount) failures this session.")
+                         ? String(localized: "\(queue.failureCount) failures this session; showing the \(queue.recentFailures.count) most recent.")
+                         : String(localized: "\(queue.failureCount) failures this session."))
                 }
             }
 

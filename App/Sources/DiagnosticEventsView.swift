@@ -18,7 +18,7 @@ struct DiagnosticEventsView: View {
         List {
             Section {
                 Picker("Show", selection: $filter) {
-                    ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(Filter.allCases) { Text(NSLocalizedString($0.rawValue, comment: "Event filter")).tag($0) }
                 }
                 .pickerStyle(.segmented)
             } footer: {
@@ -27,7 +27,7 @@ struct DiagnosticEventsView: View {
 
             Section {
                 if visible.isEmpty {
-                    Text(filter == .all ? "No events recorded yet." : "No warnings or errors.")
+                    Text(filter == .all ? String(localized: "No events recorded yet.") : String(localized: "No warnings or errors."))
                         .foregroundStyle(.secondary)
                 }
                 ForEach(Array(visible.enumerated()), id: \.offset) { _, event in
@@ -96,8 +96,8 @@ private struct DiagnosticEventRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if event.occurrences > 1 {
-                    Text("Repeated \(event.occurrences) times"
-                         + (event.firstDate.map { " since \($0.formatted(date: .omitted, time: .shortened))" } ?? ""))
+                    Text(String(localized: "Repeated \(event.occurrences) times")
+                         + (event.firstDate.map { String(localized: " since \($0.formatted(date: .omitted, time: .shortened))") } ?? ""))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -131,7 +131,7 @@ struct AutomaticRunRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Image(systemName: symbol).foregroundStyle(tint)
-                Text(run.source.rawValue).font(.subheadline.weight(.medium))
+                Text(NSLocalizedString(run.source.rawValue, comment: "Backup run source")).font(.subheadline.weight(.medium))
                 Spacer()
                 Text(run.startedAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption).foregroundStyle(.secondary)
