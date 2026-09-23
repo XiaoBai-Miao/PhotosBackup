@@ -104,7 +104,7 @@ jobs:
                   localizedDescription: (.body // ""),
                   downloadURL: $ipa.browser_download_url,
                   size: $ipa.size,
-                  minOSVersion: "15.0"
+                  minOSVersion: "16.0"
                 }]
               }]
             }' release.json > docs/apps.json
