@@ -3,7 +3,7 @@ name: PhotosBackup
 options:
   bundleIdPrefix: com.g8row.photosbackup
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "16.0"
   createIntermediateGroups: true
   minimumXcodeGenVersion: "2.40.0"
 
@@ -13,7 +13,7 @@ settings:
     CURRENT_PROJECT_VERSION: "15"
     SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1"
-    IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     # The configured Personal Team signs device builds. Simulator builds use
     # Xcode's local signing identity, which is sufficient for Keychain access.
     DEVELOPMENT_TEAM: QCXRK5J98S
