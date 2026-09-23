@@ -66,10 +66,7 @@ jobs:
           # The grep above swallows xcodebuild's status, and a run that never
           # launches prints no summary at all, so the verdict is read back from
           # the log itself.
-          if ! grep -q '\*\* TEST SUCCEEDED \*\*' build.log; then
-            python3 -c 'import sys; t=open("build.log",encoding="utf-8",errors="replace").read(); e=t.replace("%","%25").replace("\r","%0D").replace("\n","%0A"); print("::error title=build.log::"+e)'
-            exit 1
-          fi
+          grep -q '\*\* TEST SUCCEEDED \*\*' build.log
 
       - name: Upload the log if it failed
         if: failure()
