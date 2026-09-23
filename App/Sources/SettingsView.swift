@@ -225,7 +225,7 @@ struct SettingsView: View {
         switch account.status {
         case .loading: return NSLocalizedString("Looking for a saved credential", comment: "")
         case .disconnected: return NSLocalizedString("Connect to start backing up", comment: "")
-        case .connected(_, let since): return NSLocalizedString("Connected · \(since.formatted(date: .abbreviated, time: .omitted))", comment: "")
+        case .connected(_, let since): return String(format: NSLocalizedString("Connected · %@", comment: ""), since.formatted(date: .abbreviated, time: .omitted))
         case .rejected(_, let reason): return reason
         }
     }

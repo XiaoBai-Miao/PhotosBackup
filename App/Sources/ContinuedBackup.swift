@@ -58,7 +58,7 @@ struct ContinuedBackupProgress: Equatable {
     }
 
     func subtitle(waitingFor reason: String?) -> String {
-        reason ?? NSLocalizedString("\(completed.formatted()) of \(total.formatted()) done", comment: "")
+        reason ?? String(format: NSLocalizedString("%@ of %@ done", comment: ""), completed.formatted(), total.formatted())
     }
 
     /// Units iOS sees per queue item, so a heartbeat can move the reported

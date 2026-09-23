@@ -53,7 +53,7 @@ struct UploadItem: Identifiable, Equatable, Sendable {
         var label: String {
             switch self {
             case .queued: return NSLocalizedString("Waiting", comment: "")
-            case .waitingToRetry(let attempt): return NSLocalizedString("Retrying (attempt \(attempt + 1))", comment: "")
+            case .waitingToRetry(let attempt): return String(format: NSLocalizedString("Retrying (attempt %lld)", comment: ""), attempt + 1)
             case .waitingForICloud: return NSLocalizedString("Will download from iCloud when you open the app", comment: "")
             case .exporting: return NSLocalizedString("Preparing", comment: "")
             case .hashing: return NSLocalizedString("Checking", comment: "")
@@ -667,7 +667,7 @@ final class UploadQueue: ObservableObject {
                 if completionLedgerHealthy { persistenceWarning = nil }
             } catch {
                 completionLedgerHealthy = false
-                persistenceWarning = NSLocalizedString("Upload completion could not be saved: \(error.localizedDescription)", comment: "")
+                persistenceWarning = String(format: NSLocalizedString("Upload completion could not be saved: %@", comment: ""), error.localizedDescription)
             }
         }
         persistNow()
@@ -765,7 +765,7 @@ final class UploadQueue: ObservableObject {
             if !interrupted.isEmpty { noteInterruptedPreparations(interrupted) }
             pump()
         } catch {
-            persistenceWarning = NSLocalizedString("The saved upload queue could not be restored: \(error.localizedDescription)", comment: "")
+            persistenceWarning = String(format: NSLocalizedString("The saved upload queue could not be restored: %@", comment: ""), error.localizedDescription)
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Queue restore failed: \(error.localizedDescription)",
@@ -1201,7 +1201,7 @@ final class UploadQueue: ObservableObject {
         rateLimitDelay = min(Self.rateLimitMaxDelay, rateLimitDelay * 2)
         let minutes = Int(delay / 60)
         rateLimitPauseReason = NSLocalizedString("Google asked the app to slow down. Backup continues in ", comment: "")
-            + (minutes <= 1 ? NSLocalizedString("a minute.", comment: "") : NSLocalizedString("\(minutes) minutes.", comment: ""))
+            + (minutes <= 1 ? NSLocalizedString("a minute.", comment: "") : String(format: NSLocalizedString("%lld minutes.", comment: ""), minutes))
         DiagnosticEventLog.shared.record(
             "queue",
             "Google limited how many requests the app may make, so new work waits \(Int(delay)) s: \(reason)",
@@ -1302,7 +1302,7 @@ final class UploadQueue: ObservableObject {
             try persistence.save(snapshot)
             if completionLedgerHealthy { persistenceWarning = nil }
         } catch {
-            persistenceWarning = NSLocalizedString("Upload progress could not be saved: \(error.localizedDescription)", comment: "")
+            persistenceWarning = String(format: NSLocalizedString("Upload progress could not be saved: %@", comment: ""), error.localizedDescription)
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Queue save failed: \(error.localizedDescription)",
@@ -1319,7 +1319,7 @@ final class UploadQueue: ObservableObject {
             try persistence.recordCompletedSourceKey(key, for: accountIdentifier)
         } catch {
             completionLedgerHealthy = false
-            persistenceWarning = NSLocalizedString("Upload completion could not be saved: \(error.localizedDescription)", comment: "")
+            persistenceWarning = String(format: NSLocalizedString("Upload completion could not be saved: %@", comment: ""), error.localizedDescription)
             DiagnosticEventLog.shared.record(
                 "persistence",
                 "Completion ledger save failed: \(error.localizedDescription)",

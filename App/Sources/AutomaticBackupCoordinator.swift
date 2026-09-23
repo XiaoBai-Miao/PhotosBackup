@@ -511,10 +511,10 @@ final class AutomaticBackupCoordinator: ObservableObject {
         if Task.isCancelled {
             summary = NSLocalizedString("interrupted when the app left the foreground or the selection changed", comment: "")
         } else if !albums.canRead {
-            summary = NSLocalizedString("no photo library access (\(DiagnosticReportBuilder.photoAuthorization()))", comment: "")
+            summary = String(format: NSLocalizedString("no photo library access (%@)", comment: ""), DiagnosticReportBuilder.photoAuthorization())
         } else {
-            summary = NSLocalizedString("backed up \(completed); \(queue.failedCount) failed; \(queue.activeCount) unfinished", comment: "")
-                + (queue.pauseReason.map { NSLocalizedString("; paused: \($0)", comment: "") } ?? "")
+            summary = String(format: NSLocalizedString("backed up %lld; %lld failed; %lld unfinished", comment: ""), completed, queue.failedCount, queue.activeCount)
+                + (queue.pauseReason.map { String(format: NSLocalizedString("; paused: %@", comment: ""), $0) } ?? "")
         }
         AutomaticBackupRunHistory.finished(
             run,
@@ -713,12 +713,12 @@ final class AutomaticBackupCoordinator: ObservableObject {
 
     static func describeInterval(_ seconds: TimeInterval) -> String {
         let total = Int(max(0, seconds).rounded())
-        if total < 90 { return NSLocalizedString("\(total) s", comment: "") }
+        if total < 90 { return String(format: NSLocalizedString("%lld s", comment: ""), total) }
         let minutes = total / 60
-        if minutes < 90 { return NSLocalizedString("\(minutes) min", comment: "") }
+        if minutes < 90 { return String(format: NSLocalizedString("%lld min", comment: ""), minutes) }
         let hours = minutes / 60
-        if hours < 48 { return NSLocalizedString("\(hours) h \(minutes % 60) min", comment: "") }
-        return NSLocalizedString("\(hours / 24) days", comment: "")
+        if hours < 48 { return String(format: NSLocalizedString("%lld h %lld min", comment: ""), hours, minutes % 60) }
+        return String(format: NSLocalizedString("%lld days", comment: ""), hours / 24)
     }
 
     /// The outcome of one window, with the reason attached. `success` is what
@@ -1138,11 +1138,11 @@ extension AutomaticBackupCoordinator {
         guard let run = continuedRun else { return }
         continuedRun = nil
         let settled = max(0, queue.settledRowCount - run.settledBefore)
-        let settledText = settled == 1 ? NSLocalizedString("1 item", comment: "") : NSLocalizedString("\(settled) items", comment: "")
+        let settledText = settled == 1 ? NSLocalizedString("1 item", comment: "") : String(format: NSLocalizedString("%lld items", comment: ""), settled)
         AutomaticBackupRunHistory.finished(
             run.id,
             success: success,
-            summary: NSLocalizedString("finished \(settledText); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)", comment: "")
+            summary: String(format: NSLocalizedString("finished %@; %lld failed; %lld unfinished; ended because %@", comment: ""), settledText, queue.failedCount, queue.activeCount, ending)
         )
     }
 }

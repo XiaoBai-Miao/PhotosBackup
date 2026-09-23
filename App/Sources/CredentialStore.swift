@@ -85,7 +85,7 @@ actor CredentialStore {
                 // don't add a second full stop.
                 let detail = (SecCopyErrorMessageString(status, nil) as String? ?? "OSStatus \(status)")
                     .trimmingCharacters(in: CharacterSet(charactersIn: " ."))
-                return NSLocalizedString("The Keychain refused the credential: \(detail).", comment: "")
+                return String(format: NSLocalizedString("The Keychain refused the credential: %@.", comment: ""), detail)
             case .bound:
                 return NSLocalizedString("Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound.", comment: "")
             case .corrupt:

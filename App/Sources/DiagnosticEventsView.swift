@@ -96,8 +96,8 @@ private struct DiagnosticEventRow: View {
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
                 if event.occurrences > 1 {
-                    Text(NSLocalizedString("Repeated \(event.occurrences) times", comment: "")
-                         + (event.firstDate.map { NSLocalizedString(" since \($0.formatted(date: .omitted, time: .shortened))", comment: "") } ?? ""))
+                    Text(String(format: NSLocalizedString("Repeated %lld times", comment: ""), event.occurrences)
+                         + (event.firstDate.map { String(format: NSLocalizedString(" since %@", comment: ""), $0.formatted(date: .omitted, time: .shortened)) } ?? ""))
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }

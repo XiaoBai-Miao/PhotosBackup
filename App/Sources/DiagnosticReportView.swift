@@ -104,7 +104,7 @@ struct DiagnosticReportView: View {
                     automaticBackup: automaticBackup
                 )
             } catch {
-                errorMessage = NSLocalizedString("Could not create the report: \(error.localizedDescription)", comment: "")
+                errorMessage = String(format: NSLocalizedString("Could not create the report: %@", comment: ""), error.localizedDescription)
                 DiagnosticEventLog.shared.record("support", "Could not create a diagnostic report: \(error.localizedDescription)", level: .error)
             }
             isGenerating = false

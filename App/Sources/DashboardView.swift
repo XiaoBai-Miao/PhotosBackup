@@ -204,8 +204,8 @@ struct DashboardView: View {
         if selectedAlbums.isEmpty { return NSLocalizedString("Choose albums first", comment: "") }
         if queue.isUserPaused { return NSLocalizedString("Backup is paused", comment: "") }
         let backedUp = selectedBackedUpCount
-        guard selectedItemCount > 0 else { return NSLocalizedString("\(selectedItemCount.formatted()) items", comment: "") }
-        return NSLocalizedString("\(backedUp.formatted()) of \(selectedItemCount.formatted()) backed up", comment: "")
+        guard selectedItemCount > 0 else { return String(format: NSLocalizedString("%@ items", comment: ""), selectedItemCount.formatted()) }
+        return String(format: NSLocalizedString("%@ of %@ backed up", comment: ""), backedUp.formatted(), selectedItemCount.formatted())
     }
 
     /// Backed-up total for the selection, using the same "All Photos contains
@@ -347,8 +347,8 @@ struct DashboardView: View {
     private var heroSubtitle: String {
         if !account.status.isUsable { return NSLocalizedString("Connect an account to get started", comment: "") }
         if let reason = queue.pauseReason { return reason }
-        if !queue.isIdle { return NSLocalizedString("\(queue.activeCount) items remaining", comment: "") }
-        if queue.failedCount > 0 { return NSLocalizedString("\(queue.failedCount) items failed — open Activity to retry", comment: "") }
+        if !queue.isIdle { return String(format: NSLocalizedString("%lld items remaining", comment: ""), queue.activeCount) }
+        if queue.failedCount > 0 { return String(format: NSLocalizedString("%lld items failed — open Activity to retry", comment: ""), queue.failedCount) }
         if selectedAlbums.isEmpty { return NSLocalizedString("Choose albums to protect", comment: "") }
         return NSLocalizedString("Your selected albums are up to date", comment: "")
     }
@@ -373,9 +373,9 @@ struct DashboardView: View {
 
     private func progressLabel(for album: PhotoAlbum) -> String {
         guard let backedUp = albums.backedUpCounts[album.id] else {
-            return NSLocalizedString("\(album.count.formatted()) items", comment: "")
+            return String(format: NSLocalizedString("%@ items", comment: ""), album.count.formatted())
         }
-        return NSLocalizedString("\(backedUp.formatted()) of \(album.count.formatted()) backed up", comment: "")
+        return String(format: NSLocalizedString("%@ of %@ backed up", comment: ""), backedUp.formatted(), album.count.formatted())
     }
 
     private func refreshBackedUpCounts() {
@@ -399,8 +399,8 @@ struct DashboardView: View {
         case .noLibraryAccess: return NSLocalizedString("Allow photo access in Settings to back up your albums.", comment: "")
         case .noAlbumsSelected: return NSLocalizedString("Choose albums in the Albums tab first.", comment: "")
         case .nothingToDo: return NSLocalizedString("Everything in your selected albums is already backed up.", comment: "")
-        case .started(let count): return NSLocalizedString("Backing up \(count.formatted()) items. Watch progress in Activity.", comment: "")
-        case .rechecking(let count): return NSLocalizedString("Re-checking \(count.formatted()) items against Google Photos.", comment: "")
+        case .started(let count): return String(format: NSLocalizedString("Backing up %@ items. Watch progress in Activity.", comment: ""), count.formatted())
+        case .rechecking(let count): return String(format: NSLocalizedString("Re-checking %@ items against Google Photos.", comment: ""), count.formatted())
         }
     }
 

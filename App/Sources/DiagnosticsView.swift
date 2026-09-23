@@ -101,8 +101,8 @@ struct DiagnosticsView: View {
                     // The count is the part a bug report never has: one 400 and
                     // four hundred of them read identically on a cleared queue.
                     Text(queue.failureCount > queue.recentFailures.count
-                         ? NSLocalizedString("\(queue.failureCount) failures this session; showing the \(queue.recentFailures.count) most recent.", comment: "")
-                         : NSLocalizedString("\(queue.failureCount) failures this session.", comment: ""))
+                         ? String(format: NSLocalizedString("%lld failures this session; showing the %lld most recent.", comment: ""), queue.failureCount, queue.recentFailures.count)
+                         : String(format: NSLocalizedString("%lld failures this session.", comment: ""), queue.failureCount))
                 }
             }
 

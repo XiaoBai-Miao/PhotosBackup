@@ -355,7 +355,7 @@ struct OnboardingView: View {
         let count = preferences.selectedAlbumIDs.count
         return count == 0
             ? NSLocalizedString("Your account is connected. You can choose albums from the Albums tab.", comment: "")
-            : NSLocalizedString("Your account is connected, and we’ll keep \(count) selected \(count == 1 ? "album" : "albums") protected.", comment: "")
+            : String(format: NSLocalizedString("Your account is connected, and we’ll keep %lld selected %@ protected.", comment: ""), count, count == 1 ? "album" : "albums")
     }
 
     private func next() { withAnimation { step = min(pageCount - 1, step + 1) } }
@@ -450,8 +450,8 @@ struct AlbumSelectionRow: View {
     }
 
     private var detail: String {
-        guard let backedUpCount else { return NSLocalizedString("\(album.count.formatted()) items", comment: "") }
-        if backedUpCount >= album.count, album.count > 0 { return NSLocalizedString("All \(album.count.formatted()) backed up", comment: "") }
-        return NSLocalizedString("\(backedUpCount.formatted()) of \(album.count.formatted()) backed up", comment: "")
+        guard let backedUpCount else { return String(format: NSLocalizedString("%@ items", comment: ""), album.count.formatted()) }
+        if backedUpCount >= album.count, album.count > 0 { return String(format: NSLocalizedString("All %@ backed up", comment: ""), album.count.formatted()) }
+        return String(format: NSLocalizedString("%@ of %@ backed up", comment: ""), backedUpCount.formatted(), album.count.formatted())
     }
 }
