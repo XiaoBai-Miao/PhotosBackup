@@ -258,7 +258,7 @@ final class UploadQueue: ObservableObject {
     private var indexByID: [UUID: Int] = [:]
     /// Dedup keys for every row `items` currently holds, whatever its state, so
     /// an automatic rescan does not rebuild that set from the whole queue.
-    private var queuedSourceKeys: Set<String> = [:]
+    private var queuedSourceKeys: Set<String> = []
     /// Rows whose state carries a live progress fraction. Never more than
     /// `maxConcurrent` of them, so `overallFraction` sums a handful of rows
     /// rather than the entire queue.
