@@ -9,15 +9,15 @@ enum BackupConnection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .wifiOnly: return "Wi-Fi Only"
-        case .wifiAndCellular: return "Wi-Fi & Cellular"
+        case .wifiOnly: return String(localized: "Wi-Fi Only")
+        case .wifiAndCellular: return String(localized: "Wi-Fi & Cellular")
         }
     }
 
     var detail: String {
         switch self {
-        case .wifiOnly: return "Wait for Wi-Fi before uploading"
-        case .wifiAndCellular: return "Back up wherever you are"
+        case .wifiOnly: return String(localized: "Wait for Wi-Fi before uploading")
+        case .wifiAndCellular: return String(localized: "Back up wherever you are")
         }
     }
 }
@@ -160,7 +160,7 @@ final class PhotoAlbumStore: ObservableObject {
             guard fetch.count > 0 else { return }
             result.append(PhotoAlbum(
                 id: collection.localIdentifier,
-                title: collection.localizedTitle ?? "Untitled Album",
+                title: collection.localizedTitle ?? String(localized: "Untitled Album"),
                 count: fetch.count,
                 symbol: symbol(for: collection),
                 collection: collection
@@ -183,7 +183,7 @@ final class PhotoAlbumStore: ObservableObject {
         if allCount > 0 {
             ordered.insert(PhotoAlbum(
                 id: PhotoAlbum.allPhotosID,
-                title: "All Photos",
+                title: String(localized: "All Photos"),
                 count: allCount,
                 symbol: "photo.on.rectangle.angled",
                 collection: nil
