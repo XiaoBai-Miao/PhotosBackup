@@ -15,7 +15,7 @@ enum BackupShortcutBridge {
                 "Back Up Photos ran before the app finished starting, so nothing was done",
                 level: .warning
             )
-            return "Open Photos Backup once, then run this shortcut again."
+            return String(localized: "Open Photos Backup once, then run this shortcut again.")
         }
         let summary = await coordinator.performShortcutBackup().summary
         return summary.prefix(1).uppercased() + summary.dropFirst()
@@ -31,7 +31,7 @@ enum BackupShortcutBridge {
 struct BackUpPhotosIntent: AppIntent {
     static let title: LocalizedStringResource = "Back Up Photos"
     static let description = IntentDescription(
-        "Finds new photos and videos in the albums chosen in Photos Backup and starts uploading them to Google Photos. Uploads continue in the background after the action ends."
+        String(localized: "Finds new photos and videos in the albums chosen in Photos Backup and starts uploading them to Google Photos. Uploads continue in the background after the action ends.")
     )
     static let openAppWhenRun = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed

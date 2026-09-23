@@ -413,15 +413,15 @@ final class AutomaticBackupCoordinator: ObservableObject {
         guard let code = (error as? BGTaskScheduler.Error)?.code else { return error.localizedDescription }
         switch code {
         case .unavailable:
-            return "background tasks are unavailable — Background App Refresh is off for this app or the whole device, or this is the Simulator"
+            return String(localized: "background tasks are unavailable — Background App Refresh is off for this app or the whole device, or this is the Simulator")
         case .tooManyPendingTaskRequests:
-            return "iOS already holds too many pending requests from this app"
+            return String(localized: "iOS already holds too many pending requests from this app")
         case .notPermitted:
-            return "this build does not declare the task identifier in its Info.plist, or background activity is turned off for this app"
+            return String(localized: "this build does not declare the task identifier in its Info.plist, or background activity is turned off for this app")
         #if compiler(>=6.2)
         case .immediateRunIneligible:
             // A continued-processing request asked to run now or not at all.
-            return "iOS is too busy to start it right now"
+            return String(localized: "iOS is too busy to start it right now")
         #endif
         @unknown default:
             return error.localizedDescription
@@ -438,15 +438,15 @@ final class AutomaticBackupCoordinator: ObservableObject {
     /// someone who wants backups only at a time of their choosing turn the
     /// switch off and schedule the shortcut instead.
     private func backupBlocker(requiringAutomaticBackup: Bool) -> String? {
-        if !preferences.completedOnboarding { return "Onboarding is not finished" }
-        if requiringAutomaticBackup, !preferences.automaticBackup { return "Automatic Backup is turned off" }
-        if preferences.selectedAlbumIDs.isEmpty { return "No albums are selected" }
+        if !preferences.completedOnboarding { return String(localized: "Onboarding is not finished") }
+        if requiringAutomaticBackup, !preferences.automaticBackup { return String(localized: "Automatic Backup is turned off") }
+        if preferences.selectedAlbumIDs.isEmpty { return String(localized: "No albums are selected") }
         if !account.status.isUsable {
             // Before the first unlock after a restart, the Keychain item holding
             // the credential cannot be read, so the account looks disconnected.
             return UIApplication.shared.isProtectedDataAvailable
-                ? "No Google account is connected"
-                : "No Google account is available — if the iPhone has not been unlocked since it restarted, the saved account cannot be read yet"
+                ? String(localized: "No Google account is connected")
+                : String(localized: "No Google account is available — if the iPhone has not been unlocked since it restarted, the saved account cannot be read yet")
         }
         return nil
     }
@@ -509,12 +509,12 @@ final class AutomaticBackupCoordinator: ObservableObject {
         let completed = max(0, queue.completedSourceCount - completedBefore)
         let summary: String
         if Task.isCancelled {
-            summary = "interrupted when the app left the foreground or the selection changed"
+            summary = String(localized: "interrupted when the app left the foreground or the selection changed")
         } else if !albums.canRead {
-            summary = "no photo library access (\(DiagnosticReportBuilder.photoAuthorization()))"
+            summary = String(localized: "no photo library access (\(DiagnosticReportBuilder.photoAuthorization()))")
         } else {
-            summary = "backed up \(completed); \(queue.failedCount) failed; \(queue.activeCount) unfinished"
-                + (queue.pauseReason.map { "; paused: \($0)" } ?? "")
+            summary = String(localized: "backed up \(completed); \(queue.failedCount) failed; \(queue.activeCount) unfinished")
+                + (queue.pauseReason.map { String(localized: "; paused: \($0)") } ?? "")
         }
         AutomaticBackupRunHistory.finished(
             run,
@@ -713,12 +713,12 @@ final class AutomaticBackupCoordinator: ObservableObject {
 
     static func describeInterval(_ seconds: TimeInterval) -> String {
         let total = Int(max(0, seconds).rounded())
-        if total < 90 { return "\(total) s" }
+        if total < 90 { return String(localized: "\(total) s") }
         let minutes = total / 60
-        if minutes < 90 { return "\(minutes) min" }
+        if minutes < 90 { return String(localized: "\(minutes) min") }
         let hours = minutes / 60
-        if hours < 48 { return "\(hours) h \(minutes % 60) min" }
-        return "\(hours / 24) days"
+        if hours < 48 { return String(localized: "\(hours) h \(minutes % 60) min") }
+        return String(localized: "\(hours / 24) days")
     }
 
     /// The outcome of one window, with the reason attached. `success` is what
@@ -1035,7 +1035,7 @@ extension AutomaticBackupCoordinator {
             guard queueCanMoveOnItsOwn else { return endContinuedBackup(session) }
             let progress = ContinuedBackupProgress(settledSinceStart: queue.settledRowCount - session.settledAtStart,
                                                    unfinished: queue.activeCount)
-            let waiting = queue.rateLimitPauseReason == nil ? nil : "Waiting: Google asked the app to slow down"
+            let waiting = queue.rateLimitPauseReason == nil ? nil : String(localized: "Waiting: Google asked the app to slow down")
             session.update(progress, subtitle: progress.subtitle(waitingFor: waiting))
             return
         }
@@ -1076,7 +1076,7 @@ extension AutomaticBackupCoordinator {
     @available(iOS 26.0, *)
     private func endContinuedBackup(_ session: ContinuedBackupSession) {
         let idle = queue.isIdle
-        let reason = idle ? "nothing is left to back up" : (queue.pauseReason ?? "nothing can move on its own")
+        let reason = idle ? String(localized: "nothing is left to back up") : (queue.pauseReason ?? String(localized: "nothing can move on its own"))
         finishContinuedRun(success: idle, ending: reason)
         DiagnosticEventLog.shared.record("scheduler", "Ended the background continuation: \(reason)")
         if UIApplication.shared.applicationState != .active { settleIntoSuspension() }
@@ -1138,10 +1138,11 @@ extension AutomaticBackupCoordinator {
         guard let run = continuedRun else { return }
         continuedRun = nil
         let settled = max(0, queue.settledRowCount - run.settledBefore)
+        let settledText = settled == 1 ? String(localized: "1 item") : String(localized: "\(settled) items")
         AutomaticBackupRunHistory.finished(
             run.id,
             success: success,
-            summary: "finished \(settled) item\(settled == 1 ? "" : "s"); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)"
+            summary: String(localized: "finished \(settledText); \(queue.failedCount) failed; \(queue.activeCount) unfinished; ended because \(ending)")
         )
     }
 }

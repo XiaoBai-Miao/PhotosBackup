@@ -56,7 +56,7 @@ struct SettingsView: View {
                 Image(systemName: account.status.isUsable ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .font(.title2)
                     .foregroundStyle(account.status.isUsable ? Color.green : Color.orange)
-                    .accessibilityLabel(account.status.isUsable ? "Connected" : "Action needed")
+                    .accessibilityLabel(account.status.isUsable ? String(localized: "Connected") : String(localized: "Action needed"))
             }
             .padding(.vertical, 4)
 
@@ -71,7 +71,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Text(account.verifying ? "Checking Connection…" : "Check Connection")
+                        Text(account.verifying ? String(localized: "Checking Connection…") : String(localized: "Check Connection"))
                         Spacer()
                         if account.verifying {
                             ProgressView()
@@ -101,7 +101,7 @@ struct SettingsView: View {
                     Label("Not saved to Keychain", systemImage: "key.slash")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.orange)
-                    Text(warning + " The account works for this session but may need to be connected again after relaunch.")
+                    Text(warning + " " + String(localized: "The account works for this session but may need to be connected again after relaunch."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -146,7 +146,7 @@ struct SettingsView: View {
                 runVerification()
             } label: {
                 HStack {
-                    Text(isVerifying ? "Re-checking…" : "Re-check Backups")
+                    Text(isVerifying ? String(localized: "Re-checking…") : String(localized: "Re-check Backups"))
                     Spacer()
                     if isVerifying { ProgressView() }
                 }
@@ -203,10 +203,10 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section("About") {
-            LabeledRow("App", value: "Photos Backup")
-            LabeledRow("Version", value: appVersion)
-            LabeledRow("iOS", value: UIDevice.current.systemVersion)
-            LabeledRow("Core technology") {
+            LabeledRow(String(localized: "App"), value: String(localized: "Photos Backup"))
+            LabeledRow(String(localized: "Version"), value: appVersion)
+            LabeledRow(String(localized: "iOS"), value: UIDevice.current.systemVersion)
+            LabeledRow(String(localized: "Core technology")) {
                 Link("GPMC by xob0t", destination: gpmcURL)
             }
         }
@@ -214,18 +214,18 @@ struct SettingsView: View {
 
     private var accountTitle: String {
         switch account.status {
-        case .loading: return "Checking account…"
-        case .disconnected: return "Not connected"
+        case .loading: return String(localized: "Checking account…")
+        case .disconnected: return String(localized: "Not connected")
         case .connected(let email, _): return email
-        case .rejected(let email, _): return email.isEmpty ? "Sign in again" : email
+        case .rejected(let email, _): return email.isEmpty ? String(localized: "Sign in again") : email
         }
     }
 
     private var accountSubtitle: String {
         switch account.status {
-        case .loading: return "Looking for a saved credential"
-        case .disconnected: return "Connect to start backing up"
-        case .connected(_, let since): return "Connected · \(since.formatted(date: .abbreviated, time: .omitted))"
+        case .loading: return String(localized: "Looking for a saved credential")
+        case .disconnected: return String(localized: "Connect to start backing up")
+        case .connected(_, let since): return String(localized: "Connected · \(since.formatted(date: .abbreviated, time: .omitted))")
         case .rejected(_, let reason): return reason
         }
     }

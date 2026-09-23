@@ -1,0 +1,5 @@
+/* App display name */
+"CFBundleDisplayName" = "照片备份";
+
+/* Photo library usage description */
+"NSPhotoLibraryUsageDescription" = "“照片备份”需要访问您选择的相册和照片，以便安全地将它们备份到 Google 相册。";

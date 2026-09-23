@@ -115,8 +115,8 @@ final class PhotosAccount: ObservableObject {
     /// uploads report rejection on their own through `report(_:)`.
     @discardableResult
     func verify() async -> VerificationOutcome {
-        guard let client else { return .failed("Connect an account before checking it.") }
-        guard !verifying else { return .failed("A connection check is already running.") }
+        guard let client else { return .failed(String(localized: "Connect an account before checking it.")) }
+        guard !verifying else { return .failed(String(localized: "A connection check is already running.")) }
         verifying = true
         defer { verifying = false }
         do {

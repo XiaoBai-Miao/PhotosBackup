@@ -93,7 +93,7 @@ struct SafariTutorialCard: View {
                     .font(.caption.weight(.semibold))
                 HStack(spacing: 5) {
                     Image(systemName: "lock.fill").font(.system(size: 8))
-                    Text(scene == .enableExtension ? "Safari Extensions" : "accounts.google.com")
+                    Text(scene == .enableExtension ? String(localized: "Safari Extensions") : "accounts.google.com")
                         .font(.caption2)
                         .lineLimit(1)
                 }
@@ -212,10 +212,10 @@ struct SafariTutorialCard: View {
 
 struct SafariConnectionGuide: View {
     private let steps: [(String, String, String)] = [
-        ("1", "Sign in and tap I agree", "Complete Google’s sign-in page."),
-        ("2", "Open Safari’s extension menu", "Tap the puzzle-piece or page menu icon."),
-        ("3", "Choose Photos Backup Connect", "Open our extension from the list."),
-        ("4", "Tap Connect to App", "Wait for the green confirmation, then return.")
+        ("1", String(localized: "Sign in and tap I agree"), String(localized: "Complete Google’s sign-in page.")),
+        ("2", String(localized: "Open Safari’s extension menu"), String(localized: "Tap the puzzle-piece or page menu icon.")),
+        ("3", String(localized: "Choose Photos Backup Connect"), String(localized: "Open our extension from the list.")),
+        ("4", String(localized: "Tap Connect to App"), String(localized: "Wait for the green confirmation, then return."))
     ]
 
     var body: some View {

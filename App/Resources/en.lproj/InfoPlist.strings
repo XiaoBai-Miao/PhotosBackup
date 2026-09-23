@@ -1,0 +1,5 @@
+/* App display name */
+"CFBundleDisplayName" = "Photos Backup";
+
+/* Photo library usage description */
+"NSPhotoLibraryUsageDescription" = "Photos Backup needs access to the albums and photos you choose so it can safely back them up to Google Photos.";

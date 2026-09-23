@@ -1,0 +1,397 @@
+/* Photos Backup — 简体中文本地化 */
+
+/* ===== 引导页（Onboarding） ===== */
+"PHOTOS BACKUP" = "照片备份";
+"Your memories, safely backed up" = "您的回忆，安全备份";
+"Choose the albums that matter. Photos Backup keeps them protected in your Google Photos library." = "选择重要的相册。照片备份会将它们安全地保存在您的 Google 相册中。";
+"Get Started" = "开始使用";
+"Built with GPMC by xob0t" = "由 xob0t 使用 GPMC 构建";
+"YOUR LIBRARY" = "您的照片库";
+"Choose what to protect" = "选择要保护的内容";
+"Allow photo access so you can pick albums and back up individual photos. Your library stays private on this device." = "允许访问照片，以便您选择相册并单独备份照片。您的照片库在本设备上保持私密。";
+"Continue without access" = "暂不授权继续";
+"CONNECT YOUR ACCOUNT" = "连接您的账户";
+"Sign in with Google" = "使用 Google 登录";
+"Connect your Google account to back up to Google Photos. Sign-in opens in a secure in-app window — sign in, then tap I agree." = "连接您的 Google 账户以备份到 Google 相册。登录将在应用内的安全窗口中打开——登录后，点击“我同意”。";
+"Connect Google Account" = "连接 Google 账户";
+"Verifying…" = "正在验证…";
+"Try Again" = "重试";
+"Check Again" = "重新检查";
+"Connect a Different Account" = "连接其他账户";
+"CHOOSE ALBUMS" = "选择相册";
+"What should we back up?" = "要备份哪些内容？";
+"You can change this anytime in Albums." = "您可以随时在“相册”中更改。";
+"Photo access is off" = "照片访问权限已关闭";
+"You can choose albums later after allowing photo access in Settings." = "您可以在“设置”中允许照片访问后再选择相册。";
+"Choose Later" = "稍后选择";
+"Continue" = "继续";
+"When should we back up?" = "什么时候备份？";
+"Choose how Photos Backup uses your connection." = "选择照片备份如何使用您的网络连接。";
+"Back up selected albums automatically" = "自动备份所选相册";
+"ALL SET" = "一切就绪";
+"Your backup is ready" = "您的备份已就绪";
+"Go to Photos Backup" = "前往照片备份";
+"Open Settings" = "打开设置";
+"Allow Photo Access" = "允许照片访问";
+"Your account is connected. You can choose albums from the Albums tab." = "您的账户已连接。您可以在“相册”标签页中选择相册。";
+"Your account is connected, and we’ll keep %lld selected %@ protected." = "您的账户已连接，我们会保护已选择的 %lld 个%@。";
+"CONNECTION VERIFIED" = "连接已验证";
+"COULDN’T CONNECT" = "无法连接";
+"VERIFYING ACCOUNT" = "正在验证账户";
+"WAITING TO CONNECT" = "等待连接";
+"You’re connected" = "您已连接";
+"Let’s try that again" = "让我们再试一次";
+"Checking your account…" = "正在检查您的账户…";
+"Finish connecting" = "完成连接";
+"Photos Backup verified your Google Photos account. You’re ready to continue." = "照片备份已验证您的 Google 相册账户。您可以继续了。";
+"We received the sign-in, but couldn’t verify it. Tap Try Again, sign in, and tap I agree." = "我们已收到登录信息，但无法验证。请点击“重试”，登录后点击“我同意”。";
+"We securely captured your sign-in and are verifying your Google Photos access." = "我们已安全获取您的登录信息，正在验证您的 Google 相册访问权限。";
+"Sign in and tap I agree in the connect window. We’ll verify everything before continuing." = "请在连接窗口中登录并点击“我同意”。我们会在继续前完成全部验证。";
+"%lld selected" = "已选择 %lld 个";
+"%lld items" = "%lld 个项";
+"%@ items" = "%@ 个项";
+"All %@ backed up" = "已全部备份 %@";
+"%@ of %@ backed up" = "已备份 %@ / %@";
+"Back" = "返回";
+"Opens the GPMC project on GitHub" = "在 GitHub 上打开 GPMC 项目";
+
+/* ===== 主标签页 ===== */
+"Home" = "首页";
+"Albums" = "相册";
+"Activity" = "活动";
+"Settings" = "设置";
+
+/* ===== 首页（Dashboard） ===== */
+"Photos Backup" = "照片备份";
+"Stop all backups?" = "停止所有备份？";
+"Stop Backup" = "停止备份";
+"Keep Backing Up" = "继续备份";
+"Checking your account" = "正在检查您的账户";
+"Just a moment…" = "请稍候…";
+"Connect Google Photos" = "连接 Google 相册";
+"Sign in to start protecting your library" = "登录以开始保护您的照片库";
+"Not saved to Keychain" = "未保存到钥匙串";
+"Backup paused" = "备份已暂停";
+"Backup is paused" = "备份已暂停";
+"Backed up" = "已备份";
+"In queue" = "排队中";
+"Resume" = "继续";
+"Pause" = "暂停";
+"Stop" = "停止";
+"Lets uploads in progress finish, then holds the remaining queue" = "让正在进行的上传完成后，再挂起其余队列";
+"Checking…" = "正在检查…";
+"Back Up Now" = "立即备份";
+"Choose albums first" = "请先选择相册";
+"Pick Photos" = "选择照片";
+"Manual backup" = "手动备份";
+"Automatic" = "自动";
+"Selected Albums" = "所选相册";
+"No albums selected yet. Choose albums from the Albums tab." = "尚未选择相册。请从“相册”标签页中选择。";
+"+ %lld more albums" = "另有 %lld 个相册";
+"Recent Activity" = "最近活动";
+"Account connected" = "账户已连接";
+"Account not connected" = "账户未连接";
+"Opens account settings" = "打开账户设置";
+"Connect to back up" = "连接后开始备份";
+"Backing up…" = "正在备份…";
+"Backup needs attention" = "备份需要处理";
+"Ready to back up" = "可以开始备份";
+"Backup complete" = "备份完成";
+"Connect an account to get started" = "连接账户即可开始";
+"%lld items remaining" = "还剩 %lld 个项";
+"%lld items failed — open Activity to retry" = "%lld 个项失败——打开“活动”重试";
+"Choose albums to protect" = "选择要保护的相册";
+"Your selected albums are up to date" = "您选择的相册已是最新";
+"Allow photo access in Settings to back up your albums." = "请在“设置”中允许照片访问，以便备份您的相册。";
+"Choose albums in the Albums tab first." = "请先在“相册”标签页中选择相册。";
+"Everything in your selected albums is already backed up." = "所选相册中的内容都已备份完成。";
+"Backing up %@ items. Watch progress in Activity." = "正在备份 %@ 个项。可在“活动”中查看进度。";
+"Re-checking %@ items against Google Photos." = "正在与 Google 相册核对 %@ 个项。";
+"Uploads in progress will be cancelled, the queue will be cleared, and Automatic Backup will be turned off. Photos already backed up are not affected." = "正在进行的上传将被取消，队列将被清空，自动备份将被关闭。已备份的照片不受影响。";
+"Uploads in progress will be cancelled and the queue will be cleared. Photos already backed up are not affected." = "正在进行的上传将被取消，队列将被清空。已备份的照片不受影响。";
+
+/* ===== 活动（Uploads） ===== */
+"Choose Photos or Videos" = "选择照片或视频";
+"Back up to 50 items at once" = "一次最多备份 50 个项";
+"Connect a Google Photos account before starting a backup." = "开始备份前，请先连接 Google 相册账户。";
+"Backup Paused" = "备份已暂停";
+"Resume Backup" = "恢复备份";
+"Queue Controls" = "队列控制";
+"Pause After Current Uploads" = "当前上传完成后暂停";
+"Retry Failed Uploads" = "重试失败的上传";
+"Clear Finished Uploads" = "清除已完成的上传";
+"Upload Progress Isn’t Saved" = "上传进度不会保存";
+"No backup activity" = "暂无备份活动";
+"Photos you back up manually or from selected albums will appear here." = "您手动备份或从所选相册备份的照片会显示在这里。";
+"Overall Progress" = "总体进度";
+"Uploads" = "上传";
+"%lld remaining" = "还剩 %lld 个";
+"%lld items need to download from iCloud first. Keep the app open to finish them." = "%lld 个项需要先从 iCloud 下载。请保持应用打开以完成它们。";
+"Tap for details" = "点按查看详情";
+"Retry" = "重试";
+"Cancel" = "取消";
+"Item" = "项目";
+"What Google said" = "Google 的反馈";
+"Copy Details" = "复制详情";
+"Retry This Item" = "重试此项目";
+"Upload Failed" = "上传失败";
+"Done" = "完成";
+
+/* ===== 相册（文件夹选择） ===== */
+"Loading albums…" = "正在加载相册…";
+"No albums found" = "未找到相册";
+"Albums from your Photos library will appear here." = "照片库中的相册会显示在这里。";
+"Search albums" = "搜索相册";
+"Selected albums back up automatically" = "所选相册会自动备份";
+"Automatic backup is paused" = "自动备份已暂停";
+"Limited photo access" = "有限的照片访问权限";
+"Only the photos you picked are visible to Photos Backup, so these counts do not cover your whole library." = "照片备份只能看到您选择的照片，因此这些数量并不涵盖您的整个照片库。";
+"Change in Settings" = "在“设置”中更改";
+"See your albums" = "查看您的相册";
+"Allow photo access to choose which albums Photos Backup should protect." = "允许照片访问，以选择照片备份应保护的相册。";
+"Allow access in Settings to choose albums and back up photos." = "请在“设置”中允许访问，以选择相册并备份照片。";
+"All Photos" = "所有照片";
+"Untitled Album" = "未命名相册";
+
+/* ===== 设置 ===== */
+"Disconnect Google Photos?" = "断开 Google 相册？";
+"Disconnect" = "断开";
+"New backups will stop until you connect again. Photos already backed up are not affected." = "新备份将停止，直到您重新连接。已备份的照片不受影响。";
+"Google Photos Account" = "Google 相册账户";
+"Connected" = "已连接";
+"Action needed" = "需要操作";
+"Checking Connection…" = "正在检查连接…";
+"Check Connection" = "检查连接";
+"Verified" = "已验证";
+"Disconnect Account" = "断开账户";
+"Connect Account" = "连接账户";
+"The account works for this session but may need to be connected again after relaunch." = "此会话中账户可用，但重新启动后可能需要再次连接。";
+"Automatic Backup" = "自动备份";
+"Use Connection" = "使用网络";
+"Wi-Fi Only" = "仅 Wi-Fi";
+"Wi-Fi & Cellular" = "Wi-Fi 与蜂窝网络";
+"Wait for Wi-Fi before uploading" = "上传前等待 Wi-Fi";
+"Back up wherever you are" = "随时随地备份";
+"Simultaneous Uploads" = "同时上传数";
+"Storage Saver" = "存储空间节省模式";
+"Count Against Storage Quota" = "计入存储配额";
+"Back Up Live Photo Motion" = "备份实况照片动态";
+"Backup" = "备份";
+"More simultaneous uploads finish a large backup sooner. Each one stages a full-size copy on the device while it runs, so high values use more storage, battery and data at once — 2 suits most phones. Lowering it lets uploads already running finish first.\n\nStorage Saver asks Google Photos to reduce file size. With Count Against Storage Quota off, uploads identify as an older Pixel phone so they don't use your Google storage; the Google Photos app may then label them “Storage saver” even though the original file was kept. The file size, or Google Photos on the web, shows the real quality.\n\nBack Up Live Photo Motion attaches each Live Photo's motion to its photo, so it plays as a Live Photo in Google Photos and the Google Photos app's Free up space can remove it from this iPhone. It uploads the short video too, a few MB per Live Photo, and uses storage the same way the photo does. Live Photos backed up earlier get their motion added in the background." = "同时上传的数量越多，大规模备份完成得越快。每个上传在运行期间都会在设备上暂存一份完整大小的副本，因此数值越高，同时占用的存储、电量和流量就越多——2 适合大多数手机。调低后，已在进行中的上传会先完成。\n\n存储空间节省模式会要求 Google 相册降低文件大小。关闭“计入存储配额”后，上传会伪装为旧款 Pixel 手机，从而不占用您的 Google 存储空间；Google 相册应用可能会将它们标记为“存储空间节省模式”，即使原始文件已被保留。文件大小或网页版 Google 相册会显示真实质量。\n\n“备份实况照片动态”会将每张实况照片的动态与照片关联，使其在 Google 相册中作为实况照片播放，Google 相册应用的“释放空间”功能也能将其从这部 iPhone 上移除。它还会上传这段短视频，每张实况照片约几 MB，占用存储的方式与照片相同。之前备份的实况照片会在后台补充其动态。";
+"Re-checking…" = "正在重新检查…";
+"Re-check Backups" = "重新检查备份";
+"Re-check" = "重新检查";
+"Compares your selected albums against Google Photos again. Items still in the cloud finish quickly; anything deleted there is queued for upload again." = "再次将您选择的相册与 Google 相册进行核对。仍在云端的项目会很快完成；在那里被删除的内容会重新加入上传队列。";
+"Shortcuts" = "快捷指令";
+"In the Shortcuts app, create a personal automation — when the iPhone connects to power, at a time of day, or when it joins your home Wi-Fi — set it to run immediately, and add Back Up Photos. Each run has about 30 seconds: it finds new photos in the selected albums and hands them to iOS to upload in the background. It runs even with Automatic Backup off, and still follows Use Connection and Pause. Photos stored only in iCloud wait until the app is open." = "在“快捷指令”应用中创建个人自动化——例如 iPhone 连接电源时、每天某个时间，或加入家庭 Wi-Fi 时——设为立即运行，并添加“备份照片”。每次运行约有 30 秒：它会找到所选相册中的新照片，并交给 iOS 在后台上传。即使关闭了自动备份它也会运行，并仍然遵循“使用网络”和“暂停”设置。仅存储在 iCloud 中的照片会等待应用打开后再处理。";
+"Support" = "支持";
+"Create Diagnostic Report" = "生成诊断报告";
+"Storage" = "存储空间";
+"Diagnostics" = "诊断";
+"Run Onboarding Again" = "重新运行引导";
+"About" = "关于";
+"App" = "应用";
+"Version" = "版本";
+"iOS" = "iOS";
+"Core technology" = "核心技术";
+"Checking account…" = "正在检查账户…";
+"Not connected" = "未连接";
+"Sign in again" = "重新登录";
+"Looking for a saved credential" = "正在查找已保存的凭据";
+"Connect to start backing up" = "连接后开始备份";
+"Connected · %@" = "已连接 · %@";
+"Back Up Photos action" = "备份照片操作";
+"Open Shortcuts" = "打开快捷指令";
+"The action has not run yet." = "该操作尚未运行。";
+"Requires iOS 16 or later" = "需要 iOS 16 或更高版本";
+
+/* ===== 存储空间 ===== */
+"Used by Photos Backup" = "照片备份已使用";
+"Pending upload copies" = "待上传的副本";
+"Backup history and queue" = "备份历史与队列";
+"Completed transfer receipts" = "已完成的传输记录";
+"System-managed" = "系统管理";
+"Network and web caches" = "网络与网页缓存";
+"Clean Up Unused Data" = "清理未使用的数据";
+"Cleanup removes caches, old orphaned transfer receipts, and upload copies that are not owned by the current queue. It keeps pending uploads, your Google account, and the small history used to prevent duplicate backups." = "清理会移除缓存、陈旧的孤立传输记录，以及不属于当前队列的上传副本。它会保留待上传项、您的 Google 账户，以及用于防止重复备份的小型历史记录。";
+"What is retained" = "保留的内容";
+"Pending uploads keep a full-size local copy until Google confirms the backup. Large videos are therefore the main source of temporary storage use." = "待上传项会保留完整大小的本地副本，直到 Google 确认备份完成。因此，大视频是临时存储占用的主要来源。";
+"Backup history stores account-scoped PhotoKit identifiers. It is much smaller than the media and prevents every scan from uploading the same photos again." = "备份历史存储的是账户范围内的 PhotoKit 标识符。它远小于媒体文件本身，并可防止每次扫描重复上传相同的照片。";
+
+/* ===== 诊断 ===== */
+"Environment" = "环境";
+"No backup run has been recorded yet." = "尚未记录任何备份运行。";
+"Event Timeline" = "事件时间线";
+"Recent Runs" = "最近运行";
+"Every run, newest first: opening the app, Back Up Now, Shortcuts, and the background windows iOS grants. A background run shows when iOS actually started it." = "每次运行，最新的在前：打开应用、立即备份、快捷指令，以及 iOS 授予的后台窗口。后台运行会在 iOS 实际启动时显示。";
+"Ready to run" = "可以运行";
+"Simulate Background Run" = "模拟后台运行";
+"Copy LLDB Launch Command" = "复制 LLDB 启动命令";
+"Copy Log Stream Command" = "复制日志流命令";
+"Background Debugging" = "后台调试";
+"code %lld" = "代码 %lld";
+"Copy All Failures" = "复制全部失败项";
+"Upload Failures" = "上传失败";
+"%lld failures this session; showing the %lld most recent." = "本次会话有 %lld 个失败项；显示最近 %lld 个。";
+"%lld failures this session." = "本次会话有 %lld 个失败项。";
+"Connection Flow" = "连接流程";
+"Running exchange…" = "正在执行令牌交换…";
+"Feasibility Checklist" = "可行性检查清单";
+"Re-run Read-only Check" = "重新运行只读检查";
+"Advanced: Paste oauth_token" = "高级：粘贴 oauth_token";
+"oauth_token value" = "oauth_token 值";
+"Run Exchange" = "执行交换";
+"App build & launch" = "应用构建与启动";
+"Google sign-in completed in-app" = "已在应用内完成 Google 登录";
+"oauth_token cookie present" = "存在 oauth_token Cookie";
+"App reads the oauth_token cookie" = "应用读取 oauth_token Cookie";
+"Token captured from the web view" = "已从网页视图捕获令牌";
+"App ingests the handed-off token (single use)" = "应用接收移交的令牌（一次性使用）";
+"Exchange oauth_token → Android master token" = "将 oauth_token 交换为 Android 主令牌";
+"Exchange master token → Photos access token" = "将主令牌交换为相册访问令牌";
+"Read-only Photos request succeeds" = "只读相册请求成功";
+
+/* ===== 事件时间线 ===== */
+"Show" = "显示";
+"All" = "全部";
+"Problems" = "问题";
+"Up to %lld events from the last two weeks. Warnings and errors are kept longer than routine entries. Filenames, photo identifiers, addresses and links are removed." = "显示最近两周内最多 %lld 条事件。警告和错误会比常规条目保留更久。文件名、照片标识符、地址和链接会被移除。";
+"No events recorded yet." = "尚未记录事件。";
+"No warnings or errors." = "没有警告或错误。";
+"Copy All" = "复制全部";
+"Clear Timeline" = "清除时间线";
+"Clear the event timeline?" = "清除事件时间线？";
+"A later diagnostic report will not be able to explain what happened before now." = "之后的诊断报告将无法解释此前发生的事情。";
+"Repeated %lld times" = "重复 %lld 次";
+" since %@" = "，自 %@ 起";
+"App open" = "打开应用";
+"Back Up Now" = "立即备份";
+"Re-check Backups" = "重新检查备份";
+"iOS background processing" = "iOS 后台处理";
+"Shortcuts automation" = "快捷指令自动化";
+"Background transfer completion" = "后台传输完成";
+"Continued in background" = "在后台继续";
+"Debug simulation" = "调试模拟";
+"Still running, or the app was stopped before it finished." = "仍在运行，或应用在完成前被停止。";
+"Took %@" = "耗时 %@";
+
+/* ===== 诊断报告 ===== */
+"Safe to share publicly" = "可安全公开分享";
+"The report leaves out credentials, account addresses, photo identifiers, filenames, media, and request URLs." = "报告不会包含凭据、账户地址、照片标识符、文件名、媒体和请求 URL。";
+"Generate Report" = "生成报告";
+"Refresh Report" = "刷新报告";
+"Share or Save Report" = "分享或保存报告";
+"Copied" = "已复制";
+"Copy Report Text" = "复制报告文本";
+"Generate the report soon after a problem, then attach the text file to an issue at github.com/g8row/PhotosBackup/issues." = "出现问题后尽快生成报告，然后将文本文件附到 github.com/g8row/PhotosBackup/issues 的问题中。";
+"What Stands Out" = "值得注意之处";
+"What the app decided and why, including when iOS started background work and what it achieved." = "应用的决策及原因，包括 iOS 何时启动后台工作及其完成情况。";
+"Diagnostic Report" = "诊断报告";
+"Could not create the report: %@" = "无法创建报告：%@";
+
+/* ===== 账户连接 ===== */
+"Loading Google sign-in…" = "正在加载 Google 登录…";
+
+/* ===== Safari 教程卡片 ===== */
+"Safari Extensions" = "Safari 扩展";
+"Sign in" = "登录";
+"Use your Google Account" = "使用您的 Google 账户";
+"Email or phone" = "电子邮件或手机号";
+"Next" = "下一步";
+"Extensions" = "扩展";
+"Allow extensions to customize Safari." = "允许扩展自定义 Safari。";
+"Photos Backup Connect" = "照片备份连接";
+"Website access allowed" = "已允许访问网站";
+"Turn on the extension, then return to Safari." = "打开扩展，然后返回 Safari。";
+"Safari Extension" = "Safari 扩展";
+"Ready to connect" = "可以连接";
+"We’ll securely send your sign-in to the Photos Backup app." = "我们会将您的登录信息安全地发送到照片备份应用。";
+"Connect account" = "连接账户";
+"Sign in and tap I agree" = "登录并点按“我同意”";
+"Complete Google’s sign-in page." = "完成 Google 的登录页面。";
+"Open Safari’s extension menu" = "打开 Safari 的扩展菜单";
+"Tap the puzzle-piece or page menu icon." = "点按拼图块或页面菜单图标。";
+"Choose Photos Backup Connect" = "选择“照片备份连接”";
+"Open our extension from the list." = "从列表中选择我们的扩展。";
+"Tap Connect to App" = "点按“连接到应用”";
+"Wait for the green confirmation, then return." = "等待绿色确认提示，然后返回。";
+
+/* ===== 网络策略 ===== */
+"Checking the network connection…" = "正在检查网络连接…";
+"Waiting for a network connection" = "正在等待网络连接";
+"Waiting for Wi-Fi" = "正在等待 Wi-Fi";
+
+/* ===== 账户 ===== */
+"Connect an account before checking it." = "请先连接账户再进行检查。";
+"A connection check is already running." = "连接检查已在运行。";
+"The Keychain refused the credential: %@." = "钥匙串拒绝了该凭据：%@。";
+"Google issued a bound (encrypted) token. This build cannot use it; connect an account whose token is unbound." = "Google 颁发了受绑定（加密）的令牌。此构建无法使用它；请连接令牌未受绑定的账户。";
+"The saved credential could not be read and has been discarded. Connect the account again." = "无法读取已保存的凭据，凭据已被丢弃。请重新连接账户。";
+
+/* ===== 上传队列状态 ===== */
+"Waiting" = "等待中";
+"Retrying (attempt %lld)" = "重试中（第 %lld 次）";
+"Will download from iCloud when you open the app" = "打开应用时将从 iCloud 下载";
+"Preparing" = "准备中";
+"Checking" = "检查中";
+"Looking for a copy" = "正在查找副本";
+"Uploading" = "上传中";
+"Finishing" = "完成中";
+"Already backed up" = "已备份";
+"Stopped by you" = "由您停止";
+"Preparing…" = "准备中…";
+"You paused backup. Tap Resume to continue." = "您已暂停备份。点按“继续”以恢复。";
+"Upload completion could not be saved: %@" = "无法保存上传完成状态：%@";
+"The saved upload queue could not be restored: %@" = "无法恢复已保存的上传队列：%@";
+"Upload progress could not be saved: %@" = "无法保存上传进度：%@";
+"Waiting for an allowed connection" = "正在等待允许的网络连接";
+"Paused until iOS gives the app more time" = "已暂停，直到 iOS 为应用分配更多时间";
+"Backing this item up kept being interrupted before it finished." = "此项目的备份在完成前不断被打断。";
+"Google asked the app to slow down. Backup continues in " = "Google 要求应用放慢速度。备份将在 ";
+"a minute." = "一分钟后继续。";
+"%lld minutes." = "%lld 分钟后继续。";
+"Backup stopped" = "备份已停止";
+"exporting it from Photos" = "正在从照片导出";
+"reading the file" = "正在读取文件";
+"asking Google for an existing copy" = "正在向 Google 查询现有副本";
+"uploading" = "正在上传";
+"finishing it in Google Photos" = "正在在 Google 相册中完成";
+"starting" = "正在开始";
+"Photos Backup closed unexpectedly more than once while preparing this item, so it was skipped to let the rest of the backup continue. Retry it from here, and please send a diagnostic report." = "准备此项目时，照片备份不止一次意外退出，因此跳过了它，让其余备份继续。请从这里重试，并发送诊断报告。";
+
+/* ===== 自动备份协调器 ===== */
+"background tasks are unavailable — Background App Refresh is off for this app or the whole device, or this is the Simulator" = "后台任务不可用——此应用或整个设备的“后台应用刷新”已关闭，或当前为模拟器";
+"iOS already holds too many pending requests from this app" = "iOS 已持有太多来自此应用的待处理请求";
+"this build does not declare the task identifier in its Info.plist, or background activity is turned off for this app" = "此构建未在 Info.plist 中声明任务标识符，或此应用的后台活动已关闭";
+"iOS is too busy to start it right now" = "iOS 现在过于繁忙，无法启动它";
+"Onboarding is not finished" = "引导尚未完成";
+"Automatic Backup is turned off" = "自动备份已关闭";
+"No albums are selected" = "未选择任何相册";
+"No Google account is connected" = "未连接任何 Google 账户";
+"No Google account is available — if the iPhone has not been unlocked since it restarted, the saved account cannot be read yet" = "没有可用的 Google 账户——如果 iPhone 重启后尚未解锁，则无法读取已保存的账户";
+"interrupted when the app left the foreground or the selection changed" = "应用离开前台或选择更改时被打断";
+"no photo library access (%@)" = "无照片库访问权限（%@）";
+"backed up %lld; %lld failed; %lld unfinished" = "已备份 %lld 个；失败 %lld 个；未完成 %lld 个";
+"; paused: %@" = "；已暂停：%@";
+"%lld s" = "%lld 秒";
+"%lld min" = "%lld 分钟";
+"%lld h %lld min" = "%lld 小时 %lld 分钟";
+"%lld days" = "%lld 天";
+"Waiting: Google asked the app to slow down" = "等待中：Google 要求应用放慢速度";
+"nothing is left to back up" = "没有剩余可备份的内容";
+"nothing can move on its own" = "没有可自行处理的内容";
+"1 item" = "1 个项";
+"finished %@; %lld failed; %lld unfinished; ended because %@" = "完成 %@；失败 %lld 个；未完成 %lld 个；结束原因：%@";
+
+/* ===== 后台继续（灵动岛） ===== */
+"Backing up to Google Photos" = "正在备份到 Google 相册";
+"%@ of %@ done" = "已完成 %@ / %@";
+
+/* ===== 快捷指令 ===== */
+"Back Up Photos" = "备份照片";
+"Finds new photos and videos in the albums chosen in Photos Backup and starts uploading them to Google Photos. Uploads continue in the background after the action ends." = "查找照片备份所选相册中的新照片和视频，并开始上传到 Google 相册。操作结束后，上传会在后台继续。";
+"Open Photos Backup once, then run this shortcut again." = "请先打开一次照片备份，然后再次运行此快捷指令。";
+
+/* ===== 未翻译占位（与英文一致） ===== */
+"G" = "G";
+"GPMC by xob0t" = "GPMC by xob0t";

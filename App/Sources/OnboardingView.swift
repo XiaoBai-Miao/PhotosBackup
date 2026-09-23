@@ -96,12 +96,12 @@ struct OnboardingView: View {
                     AppMark(size: 112)
                 }
             ),
-            eyebrow: "PHOTOS BACKUP",
-            title: "Your memories, safely backed up",
-            message: "Choose the albums that matter. Photos Backup keeps them protected in your Google Photos library.",
-            primaryTitle: "Get Started",
+            eyebrow: String(localized: "PHOTOS BACKUP"),
+            title: String(localized: "Your memories, safely backed up"),
+            message: String(localized: "Choose the albums that matter. Photos Backup keeps them protected in your Google Photos library."),
+            primaryTitle: String(localized: "Get Started"),
             primaryAction: next,
-            credit: "Built with GPMC by xob0t"
+            credit: String(localized: "Built with GPMC by xob0t")
         )
     }
 
@@ -115,9 +115,9 @@ struct OnboardingView: View {
                         .foregroundStyle(.pink, .purple)
                 }
             ),
-            eyebrow: "YOUR LIBRARY",
-            title: "Choose what to protect",
-            message: "Allow photo access so you can pick albums and back up individual photos. Your library stays private on this device.",
+            eyebrow: String(localized: "YOUR LIBRARY"),
+            title: String(localized: "Choose what to protect"),
+            message: String(localized: "Allow photo access so you can pick albums and back up individual photos. Your library stays private on this device."),
             primaryTitle: permissionButtonTitle,
             primaryAction: {
                 Task {
@@ -131,7 +131,7 @@ struct OnboardingView: View {
                     }
                 }
             },
-            secondaryTitle: albums.authorization == .denied || albums.authorization == .restricted ? "Continue without access" : nil,
+            secondaryTitle: albums.authorization == .denied || albums.authorization == .restricted ? String(localized: "Continue without access") : nil,
             secondaryAction: next
         )
     }
@@ -146,10 +146,10 @@ struct OnboardingView: View {
                         .foregroundStyle(BackupTheme.blue)
                 }
             ),
-            eyebrow: "CONNECT YOUR ACCOUNT",
-            title: "Sign in with Google",
-            message: "Connect your Google account to back up to Google Photos. Sign-in opens in a secure in-app window — sign in, then tap I agree.",
-            primaryTitle: "Connect Google Account",
+            eyebrow: String(localized: "CONNECT YOUR ACCOUNT"),
+            title: String(localized: "Sign in with Google"),
+            message: String(localized: "Connect your Google account to back up to Google Photos. Sign-in opens in a secure in-app window — sign in, then tap I agree."),
+            primaryTitle: String(localized: "Connect Google Account"),
             primaryAction: { showingConnect = true }
         )
     }
@@ -175,12 +175,12 @@ struct OnboardingView: View {
                     Text(connectionMessage).font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center).lineSpacing(3).padding(.top, 12)
                     Spacer(minLength: 28)
                     if !connectionVerified {
-                        Button(probe.running ? "Verifying…" : (connectionFailed ? "Try Again" : "Check Again")) {
+                        Button(probe.running ? String(localized: "Verifying…") : (connectionFailed ? String(localized: "Try Again") : String(localized: "Check Again"))) {
                             if connectionFailed { showingConnect = true } else { verifyConnection() }
                         }
                         .buttonStyle(PrimaryButtonStyle()).disabled(probe.running)
                         if !probe.running {
-                            Button("Connect a Different Account") { showingConnect = true }
+                            Button(String(localized: "Connect a Different Account")) { showingConnect = true }
                                 .font(.headline)
                                 .frame(minHeight: 44)
                                 .padding(.top, 8)
@@ -199,9 +199,9 @@ struct OnboardingView: View {
     private var chooseFolders: some View {
         VStack(spacing: 0) {
             VStack(spacing: 7) {
-                Text("CHOOSE ALBUMS").font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(BackupTheme.blue)
-                Text("What should we back up?").font(.largeTitle.bold()).multilineTextAlignment(.center)
-                Text("You can change this anytime in Albums.")
+                Text(String(localized: "CHOOSE ALBUMS")).font(.caption.weight(.bold)).tracking(1.2).foregroundStyle(BackupTheme.blue)
+                Text(String(localized: "What should we back up?")).font(.largeTitle.bold()).multilineTextAlignment(.center)
+                Text(String(localized: "You can change this anytime in Albums."))
                     .font(.body).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 24)
@@ -220,13 +220,13 @@ struct OnboardingView: View {
                         .padding(20)
                     }
                 } else {
-                    EmptyState(symbol: "photo.badge.exclamationmark", title: "Photo access is off", message: "You can choose albums later after allowing photo access in Settings.")
+                    EmptyState(symbol: "photo.badge.exclamationmark", title: String(localized: "Photo access is off"), message: String(localized: "You can choose albums later after allowing photo access in Settings."))
                     Spacer()
                 }
             }
 
             VStack(spacing: 10) {
-                Button(preferences.selectedAlbumIDs.isEmpty ? "Choose Later" : "Continue") { next() }
+                Button(preferences.selectedAlbumIDs.isEmpty ? String(localized: "Choose Later") : String(localized: "Continue")) { next() }
                     .buttonStyle(PrimaryButtonStyle())
                 Text("\(preferences.selectedAlbumIDs.count) selected")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -241,9 +241,9 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 30)
                     FeatureIcon(symbol: "wifi", size: 76)
-                    Text("When should we back up?")
+                    Text(String(localized: "When should we back up?"))
                         .font(.largeTitle.bold()).multilineTextAlignment(.center).padding(.top, 24)
-                    Text("Choose how Photos Backup uses your connection.")
+                    Text(String(localized: "Choose how Photos Backup uses your connection."))
                         .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.top, 10)
 
                     VStack(spacing: 12) {
@@ -267,11 +267,11 @@ struct OnboardingView: View {
                     }
                     .padding(.top, 28)
 
-                    Toggle("Back up selected albums automatically", isOn: $preferences.automaticBackup)
+                    Toggle(String(localized: "Back up selected albums automatically"), isOn: $preferences.automaticBackup)
                         .font(.subheadline.weight(.medium))
                         .padding(.top, 22)
                     Spacer(minLength: 28)
-                    Button("Continue") { next() }.buttonStyle(PrimaryButtonStyle())
+                    Button(String(localized: "Continue")) { next() }.buttonStyle(PrimaryButtonStyle())
                 }
                 .padding(24)
                 .frame(minHeight: geometry.size.height)
@@ -290,10 +290,10 @@ struct OnboardingView: View {
                         .foregroundStyle(.green)
                 }
             ),
-            eyebrow: "ALL SET",
-            title: "Your backup is ready",
+            eyebrow: String(localized: "ALL SET"),
+            title: String(localized: "Your backup is ready"),
             message: completionMessage,
-            primaryTitle: "Go to Photos Backup",
+            primaryTitle: String(localized: "Go to Photos Backup"),
             primaryAction: finish
         )
     }
@@ -345,17 +345,17 @@ struct OnboardingView: View {
 
     private var permissionButtonTitle: String {
         switch albums.authorization {
-        case .authorized, .limited: return "Continue"
-        case .denied, .restricted: return "Open Settings"
-        default: return "Allow Photo Access"
+        case .authorized, .limited: return String(localized: "Continue")
+        case .denied, .restricted: return String(localized: "Open Settings")
+        default: return String(localized: "Allow Photo Access")
         }
     }
 
     private var completionMessage: String {
         let count = preferences.selectedAlbumIDs.count
         return count == 0
-            ? "Your account is connected. You can choose albums from the Albums tab."
-            : "Your account is connected, and we’ll keep \(count) selected \(count == 1 ? "album" : "albums") protected."
+            ? String(localized: "Your account is connected. You can choose albums from the Albums tab.")
+            : String(localized: "Your account is connected, and we’ll keep \(count) selected \(count == 1 ? "album" : "albums") protected.")
     }
 
     private func next() { withAnimation { step = min(pageCount - 1, step + 1) } }
@@ -385,25 +385,25 @@ struct OnboardingView: View {
     }
 
     private var connectionEyebrow: String {
-        if connectionVerified { return "CONNECTION VERIFIED" }
-        if connectionFailed { return "COULDN’T CONNECT" }
-        return probe.running ? "VERIFYING ACCOUNT" : "WAITING TO CONNECT"
+        if connectionVerified { return String(localized: "CONNECTION VERIFIED") }
+        if connectionFailed { return String(localized: "COULDN’T CONNECT") }
+        return probe.running ? String(localized: "VERIFYING ACCOUNT") : String(localized: "WAITING TO CONNECT")
     }
 
     private var connectionTitle: String {
-        if connectionVerified { return "You’re connected" }
-        if connectionFailed { return "Let’s try that again" }
-        return probe.running ? "Checking your account…" : "Finish connecting"
+        if connectionVerified { return String(localized: "You’re connected") }
+        if connectionFailed { return String(localized: "Let’s try that again") }
+        return probe.running ? String(localized: "Checking your account…") : String(localized: "Finish connecting")
     }
 
     private var connectionMessage: String {
-        if connectionVerified { return "Photos Backup verified your Google Photos account. You’re ready to continue." }
+        if connectionVerified { return String(localized: "Photos Backup verified your Google Photos account. You’re ready to continue.") }
         if connectionFailed {
-            return "We received the sign-in, but couldn’t verify it. Tap Try Again, sign in, and tap I agree."
+            return String(localized: "We received the sign-in, but couldn’t verify it. Tap Try Again, sign in, and tap I agree.")
         }
         return probe.running
-            ? "We securely captured your sign-in and are verifying your Google Photos access."
-            : "Sign in and tap I agree in the connect window. We’ll verify everything before continuing."
+            ? String(localized: "We securely captured your sign-in and are verifying your Google Photos access.")
+            : String(localized: "Sign in and tap I agree in the connect window. We’ll verify everything before continuing.")
     }
 
     private func logState(_ id: String) -> ProbeStep.State? {
@@ -450,8 +450,8 @@ struct AlbumSelectionRow: View {
     }
 
     private var detail: String {
-        guard let backedUpCount else { return "\(album.count.formatted()) items" }
-        if backedUpCount >= album.count, album.count > 0 { return "All \(album.count.formatted()) backed up" }
-        return "\(backedUpCount.formatted()) of \(album.count.formatted()) backed up"
+        guard let backedUpCount else { return String(localized: "\(album.count.formatted()) items") }
+        if backedUpCount >= album.count, album.count > 0 { return String(localized: "All \(album.count.formatted()) backed up") }
+        return String(localized: "\(backedUpCount.formatted()) of \(album.count.formatted()) backed up")
     }
 }
